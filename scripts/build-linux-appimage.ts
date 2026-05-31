@@ -1,194 +1,25 @@
-import { spawn } from "child_process";
 import {
   existsSync,
   mkdirSync,
   copyFileSync,
   chmodSync,
   rmSync,
-  readdirSync,
-  statSync,
+  writeFileSync,
   symlinkSync,
 } from "fs";
 import { resolve, join } from "path";
-import * as fs from "fs";
-
-const log = (msg: string) => {
-  const now = new Date().toLocaleTimeString();
-  console.log(`[${now}] ${msg}`);
-};
+import {
+  log,
+  executeCommand,
+  downloadPodmanLinux,
+  copyDirRecursive,
+} from "./build-linux-utils.ts";
 
 interface BuildOptions {
   appPath: string; // Path to built Linux app directory
   outputDir: string; // Output directory for .AppImage
   version: string; // App version from package.json
   gpgKeyId?: string; // GPG key ID for signing (optional)
-}
-
-interface ChildProcessOptions {
-  timeout?: number;
-  env?: Record<string, string>;
-}
-
-/**
- * Execute a shell command and return result
- */
-async function executeCommand(
-  cmd: string,
-  args: string[],
-  opts: ChildProcessOptions = {}
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    const timeout = opts.timeout || 60000;
-    const childProcess = spawn(cmd, args, {
-      env: { ...process.env, ...opts.env },
-      timeout,
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    childProcess.stdout?.on("data", (data) => {
-      stdout += data.toString();
-    });
-
-    childProcess.stderr?.on("data", (data) => {
-      stderr += data.toString();
-    });
-
-    const timer = setTimeout(() => {
-      childProcess.kill();
-      resolve({
-        code: 124,
-        stdout,
-        stderr: `Timeout after ${timeout}ms`,
-      });
-    }, timeout);
-
-    childProcess.on("close", (code) => {
-      clearTimeout(timer);
-      resolve({
-        code: code || 0,
-        stdout,
-        stderr,
-      });
-    });
-
-    childProcess.on("error", (err) => {
-      clearTimeout(timer);
-      resolve({
-        code: 1,
-        stdout,
-        stderr: err.message,
-      });
-    });
-  });
-}
-
-/**
- * Download Podman binary from GitHub releases for Linux
- */
-async function downloadPodmanLinux(outputDir: string): Promise<string> {
-  log("Downloading Podman v4.9.2 for Linux...");
-
-  if (!existsSync(outputDir)) {
-    mkdirSync(outputDir, { recursive: true });
-  }
-
-  const downloadUrl =
-    "https://github.com/containers/podman/releases/download/v4.9.2/podman-4.9.2-linux-amd64.tar.gz";
-  const tarPath = join(outputDir, "podman-4.9.2-linux-amd64.tar.gz");
-  const extractDir = join(outputDir, "podman-extract");
-
-  // Clean up previous extraction if exists
-  if (existsSync(extractDir)) {
-    rmSync(extractDir, { recursive: true });
-  }
-  mkdirSync(extractDir, { recursive: true });
-
-  // Download using curl with timeout (60 seconds)
-  const downloadResult = await executeCommand("curl", [
-    "-L",
-    "--max-time",
-    "60",
-    "--progress-bar",
-    "-o",
-    tarPath,
-    downloadUrl,
-  ]);
-
-  if (downloadResult.code !== 0) {
-    throw new Error(
-      `Failed to download Podman: ${downloadResult.stderr || downloadResult.stdout}`
-    );
-  }
-
-  if (!existsSync(tarPath)) {
-    throw new Error(`Downloaded file not found at ${tarPath}`);
-  }
-
-  log(`Downloaded Podman to ${tarPath}`);
-
-  // Extract tar.gz
-  log("Extracting Podman archive...");
-  const extractResult = await executeCommand("tar", [
-    "-xzf",
-    tarPath,
-    "-C",
-    extractDir,
-  ]);
-
-  if (extractResult.code !== 0) {
-    throw new Error(
-      `Failed to extract Podman: ${extractResult.stderr || extractResult.stdout}`
-    );
-  }
-
-  // Find the podman binary
-  const possiblePaths = [
-    join(extractDir, "podman-4.9.2-linux-amd64", "podman"),
-    join(extractDir, "podman"),
-  ];
-
-  let binaryPath: string | null = null;
-  for (const path of possiblePaths) {
-    if (existsSync(path)) {
-      binaryPath = path;
-      break;
-    }
-  }
-
-  if (!binaryPath) {
-    // List contents to help debug
-    const listResult = await executeCommand("find", [extractDir, "-name", "podman"]);
-    throw new Error(
-      `Podman binary not found in extracted archive.\n${listResult.stdout}`
-    );
-  }
-
-  log(`Found Podman binary at ${binaryPath}`);
-  return binaryPath;
-}
-
-/**
- * Recursively copy directory structure
- */
-function copyDirRecursive(src: string, dest: string): void {
-  if (!existsSync(dest)) {
-    mkdirSync(dest, { recursive: true });
-  }
-
-  const entries = readdirSync(src);
-  for (const entry of entries) {
-    const srcPath = join(src, entry);
-    const destPath = join(dest, entry);
-
-    const stat = statSync(srcPath);
-    if (stat.isDirectory()) {
-      copyDirRecursive(srcPath, destPath);
-    } else {
-      copyFileSync(srcPath, destPath);
-    }
-  }
 }
 
 /**
@@ -236,9 +67,24 @@ async function prepareAppDir(
     log("Copied AppRun script");
   } else {
     log("WARNING: AppRun template not found, creating minimal one");
-    fs.writeFileSync(
+    writeFileSync(
       appRunDest,
-      `#!/bin/bash\nAPPDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\nexport LD_LIBRARY_PATH="${APPDIR}/usr/lib:${LD_LIBRARY_PATH}"\nexec "${APPDIR}/usr/bin/container-cove" "$@"\n`
+      `#!/bin/bash
+# AppImage entry point script
+# Sets up environment and executes the application
+
+# Get the AppImage directory
+APPDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Set library path to include bundled libraries
+export LD_LIBRARY_PATH="\${APPDIR}/usr/lib:\${LD_LIBRARY_PATH}"
+
+# Set Qt plugin path if Qt libraries are included
+export QT_QPA_PLATFORM_PLUGIN_PATH="\${APPDIR}/usr/lib/plugins:\${QT_QPA_PLATFORM_PLUGIN_PATH}"
+
+# Execute the application binary
+exec "\${APPDIR}/usr/bin/container-cove" "$@"
+`
     );
     chmodSync(appRunDest, 0o755);
   }
@@ -251,7 +97,7 @@ async function prepareAppDir(
     log("Copied .desktop file");
   } else {
     log("WARNING: .desktop template not found, creating minimal one");
-    fs.writeFileSync(
+    writeFileSync(
       desktopDest,
       `[Desktop Entry]
 Type=Application
@@ -261,6 +107,8 @@ Exec=container-cove %F
 Icon=AppIcon
 Categories=Utility;
 Terminal=false
+MimeType=application/x-docker-container;
+Keywords=container;docker;podman;
 `
     );
   }
@@ -476,7 +324,8 @@ if (import.meta.main) {
 
       let appVersion: string;
       try {
-        const content = fs.readFileSync(packageJsonPath, "utf-8");
+        const { readFileSync } = await import("fs");
+        const content = readFileSync(packageJsonPath, "utf-8");
         const packageJson = JSON.parse(content) as { version?: string };
 
         if (!packageJson.version) {

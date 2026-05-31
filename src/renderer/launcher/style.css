@@ -26,6 +26,24 @@
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+}
+[data-theme="light"] .app-grid::-webkit-scrollbar-track,
+[data-theme="light"] .store-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-theme="light"] .app-grid::-webkit-scrollbar-thumb,
+[data-theme="light"] .store-panel::-webkit-scrollbar-thumb {
+  background: #f4be69;
+}
+[data-theme="light"] .app-grid::-webkit-scrollbar-thumb:hover,
+[data-theme="light"] .store-panel::-webkit-scrollbar-thumb:hover {
+  background: #e0a84d;
+}
 /* ── Dark mode (default) — deep navy-black ──────────────────── */
 :root {
   --bg: #003a35;

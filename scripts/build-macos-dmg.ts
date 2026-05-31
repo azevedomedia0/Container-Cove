@@ -268,7 +268,7 @@ async function createDMG(
     mkdirSync(outputDir, { recursive: true });
   }
 
-  const dmgPath = join(outputDir, `The Loading Dock-${version}.dmg`);
+  const dmgPath = join(outputDir, `Container Cove-${version}.dmg`);
 
   // Remove existing DMG if it exists
   if (existsSync(dmgPath)) {
@@ -279,7 +279,7 @@ async function createDMG(
   const hdiutilResult = await executeCommand("hdiutil", [
     "create",
     "-volname",
-    "The Loading Dock",
+    "Container Cove",
     "-srcfolder",
     appPath,
     "-ov",
@@ -419,7 +419,7 @@ if (import.meta.main) {
 
   // Determine app path (from build output or default)
   // Electrobun builds to build/ directory
-  const appName = "The Loading Dock(r)";
+  const appName = "Container Cove";
   const appPath = resolve(
     import.meta.dir,
     "..",

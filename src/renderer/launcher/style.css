@@ -1070,7 +1070,7 @@ body {
   align-items: start;
 }
 .edit-fields-grid--env-vol {
-  grid-template-columns: 3fr 2fr;
+  grid-template-columns: 1fr 1fr;
   overflow: hidden;
 }
 .edit-fields-grid--env-vol .vol-row input {

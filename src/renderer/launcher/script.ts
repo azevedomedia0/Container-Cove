@@ -755,15 +755,6 @@ function addEnvRow(
   valInput.value = v;
   valInput.className = "kv-val";
 
-  const kcLabel = document.createElement("label");
-  kcLabel.className = "kv-keychain";
-  const kcCheck = document.createElement("input");
-  kcCheck.type = "checkbox";
-  kcCheck.checked = inKeychain;
-  kcCheck.title = "Store in system keychain";
-  kcLabel.appendChild(kcCheck);
-  kcLabel.append(" 🔑");
-
   const removeBtn = document.createElement("button");
   removeBtn.className = "kv-remove";
   removeBtn.textContent = "✕";
@@ -772,7 +763,6 @@ function addEnvRow(
 
   row.appendChild(keyInput);
   row.appendChild(valInput);
-  row.appendChild(kcLabel);
   row.appendChild(removeBtn);
   container.appendChild(row);
 }
@@ -784,10 +774,8 @@ function readEnvTable(containerId: string): { env: Record<string, string>; keych
   for (const row of container.querySelectorAll(".kv-row")) {
     const k = (row.querySelector(".kv-key") as HTMLInputElement).value.trim();
     const v = (row.querySelector(".kv-val") as HTMLInputElement).value;
-    const kc = (row.querySelector("input[type=checkbox]") as HTMLInputElement).checked;
     if (k) {
       env[k] = v;
-      if (kc) keychainKeys.push(k);
     }
   }
   return { env, keychainKeys };

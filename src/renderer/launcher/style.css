@@ -90,7 +90,7 @@ body {
   font-size: 16px;
   font-weight: 600;
   font-family:
-    "Cal Sans",
+    "Ysabeau Office",
     -apple-system,
     BlinkMacSystemFont,
     sans-serif;
@@ -1685,7 +1685,7 @@ label.settings-item {
   font-size: 18px;
   font-weight: 700;
   font-family:
-    "Cal Sans",
+    "Ysabeau Office",
     -apple-system,
     BlinkMacSystemFont,
     sans-serif;
@@ -1716,7 +1716,7 @@ label.settings-item {
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
-  font-family: "Cal Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Ysabeau Office", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 .onboarding-intro__sub {
   font-size: 12px;

@@ -1481,13 +1481,17 @@ body {
   width: 100%;
 }
 .settings-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  height: 38px;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 12px 16px !important;
+  height: auto !important;
+  min-height: unset !important;
   border-top: 1px solid var(--border);
   cursor: default;
+  box-sizing: border-box;
+  width: 100%;
 }
 .settings-group .settings-item:last-child {
   border-bottom: 1px solid var(--border);

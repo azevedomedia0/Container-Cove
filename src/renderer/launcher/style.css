@@ -608,8 +608,10 @@ body {
   gap: 6px;
   padding: 14px;
   overflow-y: auto;
-  max-height: 600px;
+  height: 360px;
+  max-height: 80vh;
   min-height: 172px;
+  resize: vertical;
 }
 
 /* ── Installed app card ─────────────────────────────────────── */

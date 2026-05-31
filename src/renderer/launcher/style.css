@@ -1074,9 +1074,8 @@ body {
   overflow: hidden;
 }
 .edit-fields-grid--env-vol .vol-row input {
-  flex: 1;
+  flex: 0 0 90px;
   min-width: 0;
-  max-width: 100%;
 }
 .edit-modal__actions {
   flex-shrink: 0;
@@ -1410,7 +1409,7 @@ body {
   flex: 0 0 130px;
 }
 .vol-row input {
-  flex: 0 0 120px;
+  flex: 0 0 90px;
 }
 
 .kv-remove,

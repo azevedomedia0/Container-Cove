@@ -5,6 +5,7 @@ import {
   isValidPortMapping,
   normalizeName,
   parsePortMappings,
+  validateLocalDomain,
   validateOpenUrl,
 } from "../../shared/validation";
 import { presetForImage } from "../../shared/presets";
@@ -89,15 +90,72 @@ let hubResultsTarget: "modal" | "inline" = "modal";
 let pendingUpdateInfo: {
   version: string;
   releaseNotes: string;
-  downloadUrl?: string;
+  downloadUrl: string;
   channel: "stable" | "beta";
 } | null = null;
+let onboardingVisible = false;
+let podmanAvailable: boolean | null = null;
+let availableNetworks: string[] = [];
+let pendingNetworkSelectTarget: "add" | "edit" | null = null;
+let pendingNetworkName: string | null = null;
+let pendingTrayBulkAction: "stop-all" | "restart-all" | null = null;
+let pendingRestartTimeout: ReturnType<typeof setTimeout> | null = null;
+let pendingRestartId: string | null = null;
 
 // Hub search cache: query (or "" for popular) → results
 const hubCache = new Map<string, DockerHubImage[]>();
 
 // Tracks GET buttons currently installing: appId → button element
 const installingRecApps = new Map<string, HTMLButtonElement>();
+
+function setRecBtnInstalled(button: HTMLButtonElement) {
+  button.classList.add("btn-pill--added");
+  button.textContent = "✓ Added";
+  button.disabled = true;
+  button.replaceWith(button.cloneNode(true) as HTMLButtonElement);
+}
+
+function startRecInstall(app: RecommendedApp, button: HTMLButtonElement) {
+  const appId = generateAppId(app.name);
+  button.disabled = true;
+  button.classList.add("btn-pill--installing");
+  const spinner = document.createElement("span");
+  spinner.className = "rec-spin";
+  button.textContent = "";
+  button.appendChild(spinner);
+  button.appendChild(document.createTextNode("Installing…"));
+  installingRecApps.set(appId, button);
+  send({
+    type: "app:add",
+    app: {
+      id: appId,
+      name: app.name,
+      image: app.image,
+      icon: app.icon,
+      description: app.description,
+      iconSlug: app.iconSlug,
+      iconUrl: app.iconUrl,
+      ports: app.ports ?? [],
+      volumes: (app.volumes ?? []).map((v) =>
+        v.replace("~/.loading-dock", dataDir),
+      ),
+      env: Object.fromEntries(
+        Object.entries(app.env ?? {}).map(([k, v]) => {
+          let val = v.replace("~/.loading-dock", dataDir);
+          if (k === "PUID") val = systemUid;
+          else if (k === "PGID") val = systemGid;
+          else if (k === "UID") val = systemUid;
+          else if (k === "GID") val = systemGid;
+          else if (k === "TZ" && (v === "UTC" || v === "")) val = systemTz;
+          return [k, val];
+        }),
+      ),
+      openUrl: app.openUrl,
+      group: app.category,
+      restartPolicy: app.restartPolicy ?? "no",
+    },
+  });
+}
 
 // ── Recommended Apps catalogue ──────────────────────────────────
 
@@ -116,7 +174,6 @@ interface RecommendedApp {
   ports?: string[];
   openUrl?: string;
   restartPolicy?: "no" | "on-failure" | "unless-stopped";
-  tags?: string[];
   env?: Record<string, string>;
   volumes?: string[];
 }
@@ -127,26 +184,26 @@ const ICON_CDN =
 const RECOMMENDED_APPS: RecommendedApp[] = [
   // Self-hosted Essentials
   // Admin credentials pre-set so the UI is accessible immediately on first launch.
-  { category: "Self-hosted Essentials", name: "Nextcloud", image: "nextcloud:latest", icon: "☁️", iconSlug: "nextcloud", description: "File hosting, calendar, contacts, and full collaboration suite. Default login: admin / changeme.", ports: ["8080:80"], openUrl: "http://localhost:8080", restartPolicy: "unless-stopped",
+  { category: "Self-hosted Essentials", name: "Nextcloud", image: "nextcloud:latest", icon: "☁️", iconSlug: "nextcloud", iconUrl: "https://images.icon-icons.com/2108/PNG/512/nextcloud_icon_130873.png", description: "File hosting, calendar, contacts, and full collaboration suite. Default login: admin / changeme.", ports: ["8080:80"], openUrl: "http://localhost:8080", restartPolicy: "unless-stopped",
     env: { NEXTCLOUD_ADMIN_USER: "admin", NEXTCLOUD_ADMIN_PASSWORD: "changeme" },
     volumes: ["~/.loading-dock/nextcloud:/var/www/html"] },
 
   // WordPress: requires a MySQL/MariaDB database — add your DB connection details before launching.
-  { category: "Self-hosted Essentials", name: "WordPress", image: "wordpress:latest", icon: "📝", iconSlug: "wordpress", description: "The world's most popular CMS. Requires a MySQL or MariaDB database — set the DB env vars to connect.", ports: ["8082:80"], openUrl: "http://localhost:8082", restartPolicy: "unless-stopped", tags: ["cms", "blog", "website"],
+  { category: "Self-hosted Essentials", name: "WordPress", image: "wordpress:latest", icon: "📝", iconSlug: "wordpress", description: "The world's most popular CMS. Requires a MySQL or MariaDB database — set the DB env vars to connect.", ports: ["8082:80"], openUrl: "http://localhost:8082", restartPolicy: "unless-stopped",
     env: { WORDPRESS_DB_HOST: "", WORDPRESS_DB_USER: "wordpress", WORDPRESS_DB_PASSWORD: "", WORDPRESS_DB_NAME: "wordpress" },
     volumes: ["~/.loading-dock/wordpress:/var/www/html"] },
 
-{ category: "Self-hosted Essentials", name: "Puter", image: "ghcr.io/heyputer/puter:latest", icon: "🖥️", iconSlug: "puter", description: "Self-hosted cloud desktop — files, apps, and AI in your browser.", ports: ["4100:4100"], openUrl: "http://localhost:4100", restartPolicy: "unless-stopped", tags: ["cloud", "desktop", "storage"],
+{ category: "Self-hosted Essentials", name: "Puter", image: "ghcr.io/heyputer/puter:latest", icon: "🖥️", iconSlug: "puter", description: "Self-hosted cloud desktop — files, apps, and AI in your browser.", ports: ["4100:4100"], openUrl: "http://localhost:4100", restartPolicy: "unless-stopped",
     volumes: ["~/.loading-dock/puter/config:/root/.config/puter"] },
 
   // Tailscale: userspace mode avoids the /dev/net/tun bind-mount and NET_ADMIN cap requirement
   // so it starts cleanly inside Docker Desktop on macOS. Paste your auth key to connect.
-  { category: "Self-hosted Essentials", name: "Tailscale", image: "tailscale/tailscale:latest", icon: "🔐", iconSlug: "tailscale", description: "Mesh VPN for secure private networking. Paste your auth key into TS_AUTHKEY, then restart to connect.", ports: [], restartPolicy: "unless-stopped", tags: ["vpn", "mesh", "tailscale", "network"],
+  { category: "Self-hosted Essentials", name: "Tailscale", image: "tailscale/tailscale:latest", icon: "🔐", iconSlug: "tailscale", iconUrl: "https://tailscale.com/favicon.png", description: "Mesh VPN for secure private networking. Paste your auth key into TS_AUTHKEY, then restart to connect.", ports: [], restartPolicy: "unless-stopped",
     env: { TS_AUTHKEY: "", TS_USERSPACE: "1", TS_STATE_DIR: "/var/lib/tailscale" },
     volumes: ["~/.loading-dock/tailscale/state:/var/lib/tailscale"] },
 
   // Photo Libraries
-  { category: "Photo Libraries", name: "Immich", image: "ghcr.io/immich-app/immich-server:release", icon: "📸", iconSlug: "immich", description: "Self-hosted photo and video backup with AI-powered search and face recognition. Requires a PostgreSQL database and Redis — start those first or use Compose.", ports: ["2283:3001"], openUrl: "http://localhost:2283", restartPolicy: "unless-stopped", tags: ["photos", "backup", "ai"],
+  { category: "Photo Libraries", name: "Immich", image: "ghcr.io/immich-app/immich-server:release", icon: "📸", iconSlug: "immich", description: "Self-hosted photo and video backup with AI-powered search and face recognition. Requires a PostgreSQL database and Redis — start those first or use Compose.", ports: ["2283:3001"], openUrl: "http://localhost:2283", restartPolicy: "unless-stopped",
     env: { DB_HOSTNAME: "host.docker.internal", DB_USERNAME: "postgres", DB_PASSWORD: "postgres", DB_DATABASE_NAME: "immich", REDIS_HOSTNAME: "host.docker.internal" },
     volumes: ["~/.loading-dock/immich/upload:/usr/src/app/upload", "~/Pictures:/usr/src/app/upload/library"] },
 
@@ -164,11 +221,11 @@ const RECOMMENDED_APPS: RecommendedApp[] = [
     volumes: ["~/.loading-dock/jellyfin/config:/config", "~/.loading-dock/jellyfin/cache:/cache", "~/Movies:/movies", "~/Music:/music", "~/TV:/tv"] },
 
   // Emby uses host port 8097 to avoid collision with Jellyfin on 8096.
-  { category: "Media Servers", name: "Emby", image: "emby/embyserver:latest", icon: "📺", iconSlug: "emby", description: "Personal media server — organise and stream your movies, TV, and music to any device.", ports: ["8097:8096", "8920:8920"], openUrl: "http://localhost:8097/web", restartPolicy: "unless-stopped", tags: ["media", "streaming", "movies", "tv"],
+  { category: "Media Servers", name: "Emby", image: "emby/embyserver:latest", icon: "📺", iconSlug: "emby", description: "Personal media server — organise and stream your movies, TV, and music to any device.", ports: ["8097:8096", "8920:8920"], openUrl: "http://localhost:8097/web", restartPolicy: "unless-stopped",
     env: { UID: "1000", GID: "1000" },
     volumes: ["~/.loading-dock/emby/config:/config", "~/Movies:/mnt/movies", "~/Music:/mnt/music", "~/TV:/mnt/tv"] },
 
-  { category: "Media Servers", name: "Navidrome", image: "deluan/navidrome:latest", icon: "🎵", iconSlug: "navidrome", description: "Modern self-hosted music server and streamer, compatible with Subsonic clients.", ports: ["4533:4533"], openUrl: "http://localhost:4533", restartPolicy: "unless-stopped", tags: ["music", "streaming", "audio"],
+  { category: "Media Servers", name: "Navidrome", image: "deluan/navidrome:latest", icon: "🎵", iconSlug: "navidrome", description: "Modern self-hosted music server and streamer, compatible with Subsonic clients.", ports: ["4533:4533"], openUrl: "http://localhost:4533", restartPolicy: "unless-stopped",
     env: { ND_MUSICFOLDER: "/music", ND_DATAFOLDER: "/data", ND_LOGLEVEL: "info" },
     volumes: ["~/.loading-dock/navidrome/data:/data", "~/Music:/music:ro"] },
 
@@ -180,12 +237,13 @@ const RECOMMENDED_APPS: RecommendedApp[] = [
     env: { N8N_BASIC_AUTH_ACTIVE: "false", N8N_PORT: "5678" },
     volumes: ["~/.loading-dock/n8n:/home/node/.n8n"] },
 
-  // Open WebUI: chat UI for local LLMs — connects to Ollama automatically via host.docker.internal.
-  { category: "AI & Automation", name: "Open WebUI", image: "ghcr.io/open-webui/open-webui:main", icon: "💬", iconSlug: "open-webui", description: "Feature-rich chat UI for Ollama and OpenAI-compatible APIs. Auto-connects to a local Ollama instance.", ports: ["3000:8080"], openUrl: "http://localhost:3000", restartPolicy: "unless-stopped", tags: ["ai", "llm", "chat", "ollama"],
+  // Open WebUI: chat UI for local LLMs — connects to Ollama automatically.
+  // host.docker.internal resolves to the host on both Podman (macOS machine / Linux ≥4) and Docker.
+  { category: "AI & Automation", name: "Open WebUI", image: "ghcr.io/open-webui/open-webui:main", icon: "💬", iconSlug: "open-webui", description: "Feature-rich chat UI for Ollama and OpenAI-compatible APIs. Auto-connects to a local Ollama instance.", ports: ["3000:8080"], openUrl: "http://localhost:3000", restartPolicy: "unless-stopped",
     env: { OLLAMA_BASE_URL: "http://host.docker.internal:11434", WEBUI_AUTH: "false" },
     volumes: ["~/.loading-dock/open-webui:/app/backend/data"] },
 
-  { category: "AI & Automation", name: "Hermes Chat", image: "ghcr.io/hermeschat/hermes:latest", icon: "💬", iconSlug: "hermes-icon", description: "Self-hosted team chat and messaging platform.", ports: ["3000:3000"], openUrl: "http://localhost:3000", restartPolicy: "unless-stopped", tags: ["chat", "messaging", "team"],
+  { category: "AI & Automation", name: "Hermes Chat", image: "ghcr.io/hermeschat/hermes:latest", icon: "💬", iconSlug: "hermes-icon", description: "Self-hosted team chat and messaging platform.", ports: ["3000:3000"], openUrl: "http://localhost:3000", restartPolicy: "unless-stopped",
     volumes: ["~/.loading-dock/hermes/data:/app/data"] },
 
   // Media Management
@@ -211,7 +269,7 @@ const RECOMMENDED_APPS: RecommendedApp[] = [
     volumes: ["~/.loading-dock/qbittorrent/config:/config", "~/Downloads:/downloads"] },
 
   // Calibre-Web: DOCKER_MODS removed — the Calibre mod triggers a multi-minute install on first boot.
-  { category: "Media Management", name: "Calibre-Web", image: "lscr.io/linuxserver/calibre-web:latest", icon: "📚", iconSlug: "calibre-web", description: "Web-based eBook manager and reader. Point it at an existing Calibre library folder on first launch.", ports: ["8083:8083"], openUrl: "http://localhost:8083", restartPolicy: "unless-stopped", tags: ["ebooks", "books", "calibre", "reading"],
+  { category: "Media Management", name: "Calibre-Web", image: "lscr.io/linuxserver/calibre-web:latest", icon: "📚", iconSlug: "calibre-web", description: "Web-based eBook manager and reader. Point it at an existing Calibre library folder on first launch.", ports: ["8083:8083"], openUrl: "http://localhost:8083", restartPolicy: "unless-stopped",
     env: { PUID: "1000", PGID: "1000", TZ: "UTC" },
     volumes: ["~/.loading-dock/calibre-web/config:/config", "~/Books:/books"] },
 
@@ -225,18 +283,18 @@ const RECOMMENDED_APPS: RecommendedApp[] = [
     env: { TZ: "UTC", WEBPASSWORD: "changeme" },
     volumes: ["~/.loading-dock/pihole/etc-pihole:/etc/pihole", "~/.loading-dock/pihole/etc-dnsmasq.d:/etc/dnsmasq.d"] },
 
-  { category: "Smart Home & Network", name: "Nginx Proxy Manager", image: "jc21/nginx-proxy-manager:latest", icon: "🔀", iconSlug: "nginx-proxy-manager", description: "Reverse proxy with a web UI for hosts, SSL (Let's Encrypt), and access lists. Default login: admin@example.com / changeme.", ports: ["8181:81", "8880:80", "4443:443"], openUrl: "http://localhost:8181", restartPolicy: "unless-stopped", tags: ["proxy", "ssl", "network"],
+  { category: "Smart Home & Network", name: "Nginx Proxy Manager", image: "jc21/nginx-proxy-manager:latest", icon: "🔀", iconSlug: "nginx-proxy-manager", description: "Reverse proxy with a web UI for hosts, SSL (Let's Encrypt), and access lists. Default login: admin@example.com / changeme.", ports: ["8181:81", "8880:80", "4443:443"], openUrl: "http://localhost:8181", restartPolicy: "unless-stopped",
     volumes: ["~/.loading-dock/nginx-proxy-manager/data:/data", "~/.loading-dock/nginx-proxy-manager/letsencrypt:/etc/letsencrypt"] },
 
   // Cloudflare DDNS: correct env var is CF_API_TOKEN (not CLOUDFLARE_API_TOKEN).
-  { category: "Smart Home & Network", name: "Cloudflare DDNS", image: "favonia/cloudflare-ddns:latest", icon: "☁️", iconSlug: "cloudflare", description: "Keeps your Cloudflare DNS records in sync when your public IP changes. Add your API token and domain to activate.", ports: [], restartPolicy: "unless-stopped", tags: ["cloudflare", "ddns", "dns", "network"],
+  { category: "Smart Home & Network", name: "Cloudflare DDNS", image: "favonia/cloudflare-ddns:latest", icon: "☁️", iconSlug: "cloudflare", description: "Keeps your Cloudflare DNS records in sync when your public IP changes. Add your API token and domain to activate.", ports: [], restartPolicy: "unless-stopped",
     env: { CF_API_TOKEN: "", DOMAINS: "example.com", PROXIED: "false", UPDATE_CRON: "@every 5m" } },
 
-  { category: "Smart Home & Network", name: "Homebridge", image: "homebridge/homebridge:latest", icon: "🏡", iconSlug: "homebridge", description: "Bridge non-HomeKit smart home devices to Apple HomeKit via a lightweight Node.js server.", ports: ["8581:8581"], openUrl: "http://localhost:8581", restartPolicy: "unless-stopped", tags: ["homekit", "smart-home", "apple", "bridge"],
+  { category: "Smart Home & Network", name: "Homebridge", image: "homebridge/homebridge:latest", icon: "🏡", iconSlug: "homebridge", description: "Bridge non-HomeKit smart home devices to Apple HomeKit via a lightweight Node.js server.", ports: ["8581:8581"], openUrl: "http://localhost:8581", restartPolicy: "unless-stopped",
     env: { TZ: "UTC", HOMEBRIDGE_CONFIG_UI: "1", HOMEBRIDGE_CONFIG_UI_PORT: "8581" },
     volumes: ["~/.loading-dock/homebridge/config:/homebridge"] },
 
-  { category: "Smart Home & Network", name: "Syncthing", image: "syncthing/syncthing:latest", icon: "🔄", iconSlug: "syncthing", description: "Continuous file synchronisation — securely sync files between devices without a central server.", ports: ["8384:8384", "22000:22000"], openUrl: "http://localhost:8384", restartPolicy: "unless-stopped", tags: ["sync", "backup", "files", "p2p"],
+  { category: "Smart Home & Network", name: "Syncthing", image: "syncthing/syncthing:latest", icon: "🔄", iconSlug: "syncthing", description: "Continuous file synchronisation — securely sync files between devices without a central server.", ports: ["8384:8384", "22000:22000"], openUrl: "http://localhost:8384", restartPolicy: "unless-stopped",
     env: { PUID: "1000", PGID: "1000" },
     volumes: ["~/.loading-dock/syncthing/config:/var/syncthing/config", "~/Sync:/var/syncthing/data"] },
 ];
@@ -255,46 +313,180 @@ function showBanner(id: string, message: string, timeout = 4500) {
   if (timeout > 0)
     window.setTimeout(() => banner.classList.add("hidden"), timeout);
 }
+
+function showRestartToast(appName: string, appId: string) {
+  // Cancel any existing pending restart
+  if (pendingRestartTimeout) {
+    clearTimeout(pendingRestartTimeout);
+    pendingRestartTimeout = null;
+    pendingRestartId = null;
+  }
+
+  const toast = document.getElementById("restart-toast");
+  const msg = document.getElementById("restart-toast-msg");
+  if (!toast || !msg) return;
+
+  pendingRestartId = appId;
+  msg.textContent = `Restarting ${appName}…`;
+  toast.classList.remove("hidden");
+
+  pendingRestartTimeout = window.setTimeout(() => {
+    pendingRestartTimeout = null;
+    pendingRestartId = null;
+    toast.classList.add("hidden");
+    send({ type: "app:restart", id: appId });
+  }, 3000);
+}
 function showError(message: string) {
   showBanner("error-banner", message);
 }
-let dockerStartAttempted = false;
+function hideTrayBulkActionModal() {
+  pendingTrayBulkAction = null;
+  document.getElementById("tray-confirm-modal")?.classList.add("hidden");
+}
+function showTrayBulkActionModal(action: "stop-all" | "restart-all") {
+  pendingTrayBulkAction = action;
+  const modal = document.getElementById("tray-confirm-modal");
+  const title = document.getElementById("tray-confirm-title");
+  const body = document.getElementById("tray-confirm-body");
+  const accept = document.getElementById("tray-confirm-accept") as HTMLButtonElement | null;
+  if (!modal || !title || !body || !accept) return;
+  title.textContent = action === "stop-all" ? "Stop all running containers?" : "Restart all running containers?";
+  body.textContent = action === "stop-all"
+    ? "This will stop every running app in the tray. Any open web UIs will close and services will go offline until you launch them again."
+    : "This will restart every running app in the tray. Services may briefly disappear while containers come back up.";
+  accept.textContent = action === "stop-all" ? "Stop All" : "Restart All";
+  accept.classList.toggle("btn--danger", action === "stop-all");
+  accept.classList.toggle("btn--primary", action !== "stop-all");
+  modal.classList.remove("hidden");
+}
+let podmanStartAttempted = false;
 function showOnboardingPanel() {
   const panel = document.getElementById("onboarding-panel");
   if (!panel) return;
-
-  const pathLabel = document.getElementById("onboarding-datadir-path");
-  if (pathLabel) pathLabel.textContent = dataDir;
-
+  if (onboardingVisible) return;
+  onboardingVisible = true;
   panel.classList.remove("hidden");
+}
 
-  document.getElementById("btn-onboarding-pick-dir")?.addEventListener("click", () => {
-    send({ type: "dialog:pick-folder", callbackId: "onboarding-datadir" });
-  });
+function hideOnboardingPanel() {
+  const panel = document.getElementById("onboarding-panel");
+  if (!panel) return;
+  onboardingVisible = false;
+  panel.classList.add("hidden");
+}
 
-  document.getElementById("btn-onboarding-dismiss")?.addEventListener("click", () => {
-    const noStartup = (document.getElementById("onboarding-no-startup") as HTMLInputElement)?.checked ?? false;
-    send({ type: "onboarding:dismiss", noStartup });
-    panel.classList.add("hidden");
-  });
+function setRecommendedSectionOpen(open: boolean) {
+  const section = document.getElementById("section-recommended") as HTMLDetailsElement | null;
+  if (!section) return;
+  section.open = open;
+}
+
+function setPodmanInstallPromptVisible(visible: boolean) {
+  const bannerCta = document.getElementById("btn-docker-install");
+  const onboardingCta = document.getElementById("onboarding-podman-install");
+  if (bannerCta) bannerCta.classList.toggle("hidden", !visible);
+  if (onboardingCta) onboardingCta.classList.toggle("hidden", !visible);
+}
+
+function updateOnboardingPodmanCopy(isFirstRun: boolean) {
+  const strong = document.querySelector("#onboarding-podman-install .onboarding-install__copy strong");
+  const small = document.querySelector("#onboarding-podman-install .onboarding-install__copy small");
+  if (!strong || !small) return;
+  if (isFirstRun) {
+    strong.textContent = "Install Podman first";
+    small.textContent = "The Loading Dock(r) uses Podman to run your apps. Open the install guide, install Podman, then come back and click Retry.";
+  } else {
+    strong.textContent = "Podman is not responding";
+    small.textContent = "Podman was working before but is no longer available. Click Retry to restart it, or open the install guide if it has been uninstalled.";
+  }
+}
+
+function updateDataDirDisplays(path: string) {
+  const el = document.getElementById("settings-datadir-path");
+  if (el) el.textContent = path;
+}
+
+function populateNetworkSelect(selectId: string, currentValue = "") {
+  const select = document.getElementById(selectId) as HTMLSelectElement | null;
+  if (!select) return;
+  const selected = currentValue || select.value || "";
+  while (select.firstChild) select.removeChild(select.firstChild);
+  const defaultOpt = document.createElement("option");
+  defaultOpt.value = "";
+  defaultOpt.textContent = "Default";
+  select.appendChild(defaultOpt);
+  for (const name of availableNetworks) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    select.appendChild(opt);
+  }
+  select.value = availableNetworks.includes(selected) ? selected : "";
+}
+
+function refreshNetworkSelects(addValue = "", editValue = "") {
+  populateNetworkSelect("add-network", addValue);
+  populateNetworkSelect("edit-network", editValue);
+}
+
+function requestNetworksList() {
+  send({ type: "networks:list" });
+}
+
+function promptForNetworkName(): string | null {
+  const value = window.prompt("Create a new Docker network", "");
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return trimmed;
 }
 
 function toggleDockerWarning(show: boolean) {
+  setDockerWarningState(
+    show
+      ? {
+          visible: true,
+          message: podmanStartAttempted
+            ? "Podman is still coming up. Please wait…"
+            : "Starting Podman — please wait…",
+          canRetry: false,
+          canInstall: false,
+        }
+      : { visible: false },
+  );
+}
+
+function setDockerWarningState(state: {
+  visible: boolean;
+  message?: string;
+  detail?: string;
+  canRetry?: boolean;
+  canInstall?: boolean;
+}) {
   const banner = document.getElementById("docker-warning");
   const label = document.getElementById("docker-warning-text");
-  if (!banner || !label) return;
-  banner.classList.toggle("hidden", !show);
-  if (show) {
-    if (!dockerStartAttempted) {
-      dockerStartAttempted = true;
-      label.textContent = "Starting Docker — please wait…";
-    }
-    // If we receive a second false→true cycle it means the timeout was hit
-    // and the main process never sent available:true. Keep the warning visible.
-  } else {
-    // Docker became available — reset for next session
-    dockerStartAttempted = false;
+  const detailEl = document.getElementById("docker-warning-detail");
+  const install = document.getElementById("btn-docker-install") as HTMLButtonElement | null;
+  const retry = document.getElementById("btn-docker-retry") as HTMLButtonElement | null;
+  if (!banner || !label || !retry) return;
+  banner.classList.toggle("hidden", !state.visible);
+  if (install) {
+    install.classList.toggle("hidden", !state.visible || !state.canInstall);
+    install.textContent = "Open install guide";
   }
+  if (detailEl) {
+    detailEl.classList.toggle("hidden", !state.visible || !state.detail);
+    detailEl.textContent = state.detail ?? "";
+  }
+  if (!state.visible) {
+    podmanStartAttempted = false;
+    retry.classList.add("hidden");
+    if (install) install.classList.add("hidden");
+    return;
+  }
+  podmanStartAttempted = true;
+  label.textContent = state.message ?? "Podman is unavailable.";
+  retry.classList.toggle("hidden", !state.canRetry);
 }
 
 // ── Update chip (topbar one-click flow) ─────────────────────────
@@ -396,7 +588,7 @@ function wireCardButtons(card: HTMLElement, app: DockerApp) {
   });
   card.querySelector("[data-action='restart']")?.addEventListener("click", (e) => {
     e.stopPropagation();
-    send({ type: "app:restart", id: app.id });
+    showRestartToast(app.name, app.id);
   });
   card.querySelector("[data-action='edit']")?.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -665,21 +857,16 @@ function openEditModal(app: DockerApp) {
   (document.getElementById("edit-ports") as HTMLInputElement).value = app.ports.join(", ");
   (document.getElementById("edit-url") as HTMLInputElement).value = app.openUrl ?? "";
   (document.getElementById("edit-group") as HTMLInputElement).value = app.group ?? "";
-  (document.getElementById("edit-tags") as HTMLInputElement).value = (app.tags ?? []).join(", ");
   (document.getElementById("edit-restart") as HTMLSelectElement).value = app.restartPolicy ?? "no";
-  (document.getElementById("edit-health-cmd") as HTMLInputElement).value = app.healthcheck?.cmd ?? "";
-  (document.getElementById("edit-health-interval") as HTMLInputElement).value =
-    app.healthcheck?.intervalSec?.toString() ?? "";
-  (document.getElementById("edit-health-timeout") as HTMLInputElement).value =
-    app.healthcheck?.timeoutSec?.toString() ?? "";
-  (document.getElementById("edit-health-retries") as HTMLInputElement).value =
-    app.healthcheck?.retries?.toString() ?? "";
+  populateNetworkSelect("edit-network", app.network ?? "");
+  (document.getElementById("edit-local-domain") as HTMLInputElement).value = app.localDomain ?? "";
   buildEnvTable("edit-env-table", app.env, app.keychainEnvKeys);
   buildVolTable("edit-vol-table", app.volumes);
   // Show the Stop button only when the app is currently running
   const stopBtn = document.getElementById("btn-edit-stop") as HTMLButtonElement;
   stopBtn.classList.toggle("hidden", app.status !== "running");
   document.getElementById("modal-edit")!.classList.remove("hidden");
+  requestNetworksList();
 }
 
 function parseHealth(prefix: "add" | "edit") {
@@ -696,9 +883,11 @@ function parseAndValidateForm(
   image: string,
   portsRaw: string,
   openUrlRaw: string,
+  networkRaw: string,
+  localDomainRaw: string,
   sourceId?: string,
 ) {
-  if (!name || !image) throw new Error("Name and Docker image are required.");
+  if (!name || !image) throw new Error("Name and container image are required.");
   const normalizedName = normalizeName(name);
   if (apps.some((a) => normalizeName(a.name) === normalizedName && a.id !== sourceId)) {
     throw new Error("An app with this name already exists.");
@@ -708,7 +897,23 @@ function parseAndValidateForm(
     throw new Error("Ports must use host:container (1-65535), e.g. 8080:80 or 53:53/udp.");
   }
   const openUrl = validateOpenUrl(openUrlRaw);
-  return { ports, openUrl };
+  const network = networkRaw.trim() || undefined;
+  const localDomain = validateLocalDomain(localDomainRaw);
+  if (localDomain && ports.length === 0) {
+    throw new Error("Local domain requires at least one published port.");
+  }
+  if (localDomain && apps.some((a) => a.localDomain === localDomain && a.id !== sourceId)) {
+    throw new Error("Another app is already using this local domain.");
+  }
+  return { ports, openUrl, network, localDomain };
+}
+
+function handleNetworkCreate(target: "add" | "edit") {
+  const name = promptForNetworkName();
+  if (!name) return;
+  pendingNetworkSelectTarget = target;
+  pendingNetworkName = name;
+  send({ type: "network:create", name });
 }
 
 // ── IPC message handlers ────────────────────────────────────────
@@ -726,15 +931,70 @@ ev.on("ipc-message", (msg: IpcMessage) => {
           installingRecApps.delete(id);
         }
       }
+      // Revert "Added" buttons back to "GET" if the app was uninstalled
+      {
+        const grid = document.getElementById("store-grid");
+        if (grid) {
+          for (const btn of grid.querySelectorAll<HTMLButtonElement>("button[data-image].btn-pill--added")) {
+            const image = btn.dataset.image;
+            if (image && !apps.some((a) => a.image === image)) {
+              const fresh = btn.cloneNode(true) as HTMLButtonElement;
+              fresh.classList.remove("btn-pill--added");
+              fresh.disabled = false;
+              fresh.textContent = "GET";
+              const app = RECOMMENDED_APPS.find((r) => r.image === image);
+              if (app) {
+                fresh.addEventListener("click", () => startRecInstall(app, fresh));
+              }
+              btn.replaceWith(fresh);
+            }
+          }
+        }
+      }
       refreshGroupFilterOptions();
       renderGrid();
+      break;
+    case "networks:listed":
+      availableNetworks = [...msg.networks].sort((a, b) => a.localeCompare(b));
+      {
+        const addSelect = document.getElementById("add-network") as HTMLSelectElement | null;
+        const editSelect = document.getElementById("edit-network") as HTMLSelectElement | null;
+        const addValue = pendingNetworkSelectTarget === "add" && pendingNetworkName
+          ? pendingNetworkName
+          : addSelect?.value ?? "";
+        const editValue = pendingNetworkSelectTarget === "edit" && pendingNetworkName
+          ? pendingNetworkName
+          : editSelect?.value ?? "";
+        refreshNetworkSelects(addValue, editValue);
+      }
+      if (pendingNetworkSelectTarget && pendingNetworkName) {
+        const selectId = pendingNetworkSelectTarget === "add" ? "add-network" : "edit-network";
+        const select = document.getElementById(selectId) as HTMLSelectElement | null;
+        if (select && availableNetworks.includes(pendingNetworkName)) {
+          select.value = pendingNetworkName;
+        }
+        pendingNetworkSelectTarget = null;
+        pendingNetworkName = null;
+      }
       break;
     case "update:state":
       (document.getElementById("release-channel") as HTMLSelectElement).value =
         msg.channel;
       break;
     case "docker:availability":
-      toggleDockerWarning(!msg.available);
+      podmanAvailable = msg.available;
+      setDockerWarningState(
+        msg.available
+          ? { visible: false }
+          : {
+              visible: true,
+              message: msg.message ?? "Podman is unavailable.",
+              detail: msg.detail,
+              canRetry: msg.canRetry ?? true,
+              canInstall: msg.canInstall ?? true,
+            },
+      );
+      setPodmanInstallPromptVisible(!msg.available);
       break;
     case "onboarding:state":
       firstRun = msg.firstRun;
@@ -742,9 +1002,23 @@ ev.on("ipc-message", (msg: IpcMessage) => {
       systemUid = msg.systemUid;
       systemGid = msg.systemGid;
       systemTz = msg.systemTz;
+      updateDataDirDisplays(dataDir);
       renderGrid();
-      if (msg.showOnboarding) showOnboardingPanel();
+      setPodmanInstallPromptVisible(podmanAvailable === false);
+      setRecommendedSectionOpen(msg.firstRun);
+      updateOnboardingPodmanCopy(msg.firstRun);
+      if (msg.firstRun || msg.showOnboarding) showOnboardingPanel();
       break;
+    case "desktop:shortcut:progress": {
+      const popup = document.getElementById("desktop-shortcut-popup");
+      if (!popup) break;
+      if (msg.state === "creating") {
+        popup.classList.remove("hidden");
+      } else {
+        popup.classList.add("hidden");
+      }
+      break;
+    }
     case "app:status": {
       const app = apps.find((a) => a.id === msg.id);
       if (app) {
@@ -810,6 +1084,7 @@ ev.on("ipc-message", (msg: IpcMessage) => {
       pendingUpdateInfo = {
         version: msg.version,
         releaseNotes: msg.releaseNotes,
+        downloadUrl: msg.downloadUrl,
         channel: msg.channel,
       };
       setUpdateChip("available", `v${msg.version} available — click to install`);
@@ -841,6 +1116,7 @@ ev.on("ipc-message", (msg: IpcMessage) => {
       (document.getElementById("toggle-error-logging") as HTMLInputElement).checked = msg.errorLoggingEnabled;
       (document.getElementById("toggle-show-onboarding") as HTMLInputElement).checked = msg.showOnboarding;
       dataDir = msg.dataDir;
+      updateDataDirDisplays(dataDir);
       systemUid = msg.systemUid;
       systemGid = msg.systemGid;
       systemTz = msg.systemTz;
@@ -857,15 +1133,17 @@ ev.on("ipc-message", (msg: IpcMessage) => {
       break;
     }
     case "dialog:folder-result": {
-      if (msg.callbackId === "onboarding-datadir") {
+      if (msg.callbackId === "settings-datadir") {
         dataDir = msg.path;
-        const pathLabel = document.getElementById("onboarding-datadir-path");
-        if (pathLabel) pathLabel.textContent = dataDir;
+        updateDataDirDisplays(dataDir);
         send({ type: "settings:data-dir", path: dataDir });
       }
       break;
     }
     case "dialog:folder-cancelled":
+      break;
+    case "tray:bulk-action-request":
+      showTrayBulkActionModal(msg.action);
       break;
     case "app:health-restart":
       showBanner(
@@ -992,7 +1270,8 @@ function fillAddFromRec(app: RecommendedApp) {
   (document.getElementById("add-health-timeout") as HTMLInputElement).value = "";
   (document.getElementById("add-health-retries") as HTMLInputElement).value = "";
   (document.getElementById("add-group") as HTMLInputElement).value = app.category;
-  (document.getElementById("add-tags") as HTMLInputElement).value = (app.tags ?? []).join(", ");
+  populateNetworkSelect("add-network", "");
+  (document.getElementById("add-local-domain") as HTMLInputElement).value = "";
   buildEnvTable("add-env-table", app.env ?? {});
   buildVolTable("add-vol-table", app.volumes ?? []);
 }
@@ -1045,60 +1324,14 @@ function buildRecCard(app: RecommendedApp): HTMLElement {
 
   const btn = document.createElement("button");
   btn.className = "btn-pill";
+  btn.dataset.image = app.image;
 
   const alreadyInstalled = apps.some((a) => a.image === app.image);
   if (alreadyInstalled) {
-    btn.classList.add("btn-pill--added");
-    btn.textContent = "✓ Added";
-    btn.disabled = true;
+    setRecBtnInstalled(btn);
   } else {
     btn.textContent = "GET";
-    btn.addEventListener("click", () => {
-      const appId = generateAppId(app.name);
-
-      // Immediately enter installing state
-      btn.disabled = true;
-      btn.classList.add("btn-pill--installing");
-      const spinner = document.createElement("span");
-      spinner.className = "rec-spin";
-      btn.textContent = "";
-      btn.appendChild(spinner);
-      btn.appendChild(document.createTextNode("Installing…"));
-
-      installingRecApps.set(appId, btn);
-
-      send({
-        type: "app:add",
-        app: {
-          id: appId,
-          name: app.name,
-          image: app.image,
-          icon: "default.png",
-          description: app.description,
-          ports: app.ports ?? [],
-          volumes: (app.volumes ?? []).map((v) =>
-            v.replace("~/.loading-dock", dataDir),
-          ),
-          // Pre-populate standard env vars with real system values so containers
-          // start correctly without any manual configuration.
-          env: Object.fromEntries(
-            Object.entries(app.env ?? {}).map(([k, v]) => {
-              let val = v.replace("~/.loading-dock", dataDir);
-              if (k === "PUID") val = systemUid;
-              else if (k === "PGID") val = systemGid;
-              else if (k === "UID") val = systemUid;
-              else if (k === "GID") val = systemGid;
-              else if (k === "TZ" && (v === "UTC" || v === "")) val = systemTz;
-              return [k, val];
-            }),
-          ),
-          openUrl: app.openUrl,
-          group: app.category,
-          tags: app.tags ?? [],
-          restartPolicy: app.restartPolicy ?? "no",
-        },
-      });
-    });
+    btn.addEventListener("click", () => startRecInstall(app, btn));
   }
 
   cta.appendChild(btn);
@@ -1155,7 +1388,8 @@ function fillAddFromImage(image: DockerHubImage, display: string) {
     preset?.healthcheck?.retries?.toString() ?? "";
   (document.getElementById("add-group") as HTMLInputElement).value =
     preset?.suggestedName?.toLowerCase().includes("db") ? "databases" : "";
-  (document.getElementById("add-tags") as HTMLInputElement).value = "";
+  populateNetworkSelect("add-network", "");
+  (document.getElementById("add-local-domain") as HTMLInputElement).value = "";
   buildEnvTable("add-env-table", {});
   buildVolTable("add-vol-table", []);
 }
@@ -1199,7 +1433,10 @@ document.getElementById("btn-add")!.addEventListener("click", () => {
   switchAddTab("app");
   buildEnvTable("add-env-table", {});
   buildVolTable("add-vol-table", []);
+  populateNetworkSelect("add-network", "");
+  (document.getElementById("add-local-domain") as HTMLInputElement).value = "";
   document.getElementById("modal-add")!.classList.remove("hidden");
+  requestNetworksList();
 });
 document.getElementById("btn-add-cancel")!.addEventListener("click", () => {
   document.getElementById("modal-add")!.classList.add("hidden");
@@ -1209,6 +1446,9 @@ document.getElementById("add-env-add-row")!.addEventListener("click", () => {
 });
 document.getElementById("add-vol-add-row")!.addEventListener("click", () => {
   addVolRow(document.getElementById("add-vol-table")!);
+});
+document.getElementById("add-network-create")!.addEventListener("click", () => {
+  handleNetworkCreate("add");
 });
 document.getElementById("btn-add-confirm")!.addEventListener("click", () => {
   if (addModalTab === "compose") {
@@ -1227,12 +1467,13 @@ document.getElementById("btn-add-confirm")!.addEventListener("click", () => {
     const restartPolicy = (document.getElementById("add-restart") as HTMLSelectElement)
       .value as DockerApp["restartPolicy"];
     const group = (document.getElementById("add-group") as HTMLInputElement).value.trim();
-    const tags = (document.getElementById("add-tags") as HTMLInputElement).value
-      .split(",").map((s) => s.trim()).filter(Boolean);
+    const network = (document.getElementById("add-network") as HTMLSelectElement).value;
+    const localDomainRaw = (document.getElementById("add-local-domain") as HTMLInputElement).value;
     const healthcheck = parseHealth("add");
     const { env, keychainKeys } = readEnvTable("add-env-table");
     const volumes = readVolTable("add-vol-table");
-    const { ports, openUrl } = parseAndValidateForm(name, image, portsRaw, openUrlRaw);
+    const { ports, openUrl, network: selectedNetwork, localDomain } =
+      parseAndValidateForm(name, image, portsRaw, openUrlRaw, network, localDomainRaw);
     const appId = generateAppId(name);
     send({
       type: "app:add",
@@ -1247,9 +1488,9 @@ document.getElementById("btn-add-confirm")!.addEventListener("click", () => {
         volumes,
         openUrl,
         group: group || undefined,
-        tags,
         restartPolicy,
-        healthcheck,
+        network: selectedNetwork,
+        localDomain,
         keychainEnvKeys: keychainKeys.length ? keychainKeys : undefined,
       },
     });
@@ -1307,6 +1548,9 @@ document.getElementById("edit-env-add-row")!.addEventListener("click", () => {
 document.getElementById("edit-vol-add-row")!.addEventListener("click", () => {
   addVolRow(document.getElementById("edit-vol-table")!);
 });
+document.getElementById("edit-network-create")!.addEventListener("click", () => {
+  handleNetworkCreate("edit");
+});
 document.getElementById("btn-edit-confirm")!.addEventListener("click", () => {
   if (!editTarget) return;
   try {
@@ -1317,12 +1561,12 @@ document.getElementById("btn-edit-confirm")!.addEventListener("click", () => {
     const restartPolicy = (document.getElementById("edit-restart") as HTMLSelectElement)
       .value as DockerApp["restartPolicy"];
     const group = (document.getElementById("edit-group") as HTMLInputElement).value.trim();
-    const tags = (document.getElementById("edit-tags") as HTMLInputElement).value
-      .split(",").map((s) => s.trim()).filter(Boolean);
-    const healthcheck = parseHealth("edit");
+    const network = (document.getElementById("edit-network") as HTMLSelectElement).value;
+    const localDomainRaw = (document.getElementById("edit-local-domain") as HTMLInputElement).value;
     const { env, keychainKeys } = readEnvTable("edit-env-table");
     const volumes = readVolTable("edit-vol-table");
-    const { ports, openUrl } = parseAndValidateForm(name, image, portsRaw, openUrlRaw, editTarget.id);
+    const { ports, openUrl, network: selectedNetwork, localDomain } =
+      parseAndValidateForm(name, image, portsRaw, openUrlRaw, network, localDomainRaw, editTarget.id);
     const appId = editTarget.id;
     send({
       type: "app:update",
@@ -1336,9 +1580,9 @@ document.getElementById("btn-edit-confirm")!.addEventListener("click", () => {
         volumes,
         openUrl,
         group: group || undefined,
-        tags,
         restartPolicy,
-        healthcheck,
+        network: selectedNetwork,
+        localDomain,
         keychainEnvKeys: keychainKeys.length ? keychainKeys : undefined,
       },
     });
@@ -1362,14 +1606,52 @@ document.getElementById("btn-edit-confirm")!.addEventListener("click", () => {
 // ── Filters & toolbar ───────────────────────────────────────────
 
 document.getElementById("btn-check-update")?.addEventListener("click", () => {
+  send({ type: "docker:start-if-needed" });
   send({ type: "update:check" });
   setUpdateChip("checking");
+});
+document.getElementById("btn-onboarding-dismiss")?.addEventListener("click", () => {
+  const noStartup = (document.getElementById("onboarding-no-startup") as HTMLInputElement)?.checked ?? false;
+  send({ type: "onboarding:dismiss", noStartup });
+  hideOnboardingPanel();
+});
+document.getElementById("btn-onboarding-skip")?.addEventListener("click", () => {
+  const noStartup = (document.getElementById("onboarding-no-startup") as HTMLInputElement)?.checked ?? false;
+  send({ type: "onboarding:dismiss", noStartup });
+  hideOnboardingPanel();
+});
+document.getElementById("tray-confirm-cancel")?.addEventListener("click", hideTrayBulkActionModal);
+document.getElementById("tray-confirm-modal")?.addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) {
+    hideTrayBulkActionModal();
+  }
+});
+document.getElementById("tray-confirm-accept")?.addEventListener("click", () => {
+  if (!pendingTrayBulkAction) return;
+  send({ type: "tray:bulk-action-confirm", action: pendingTrayBulkAction });
+  hideTrayBulkActionModal();
+});
+document.getElementById("onboarding-panel")?.addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) {
+    const noStartup = (document.getElementById("onboarding-no-startup") as HTMLInputElement)?.checked ?? false;
+    send({ type: "onboarding:dismiss", noStartup });
+    hideOnboardingPanel();
+  }
 });
 
 // ── Import / export ─────────────────────────────────────────────
 
 document.getElementById("btn-export-registry")!.addEventListener("click", () => {
   send({ type: "registry:export" });
+});
+document.getElementById("btn-docker-retry")?.addEventListener("click", () => {
+  send({ type: "docker:retry" });
+});
+document.getElementById("btn-docker-install")?.addEventListener("click", () => {
+  send({ type: "podman:install" });
+});
+document.getElementById("btn-onboarding-install-podman")?.addEventListener("click", () => {
+  send({ type: "podman:install" });
 });
 document.getElementById("btn-import-registry")!.addEventListener("click", () => {
   (document.getElementById("registry-import-file") as HTMLInputElement).click();
@@ -1391,6 +1673,17 @@ document.getElementById("btn-settings-close")!.addEventListener("click", () => {
 document.getElementById("modal-settings")!.addEventListener("click", (e) => {
   if (e.target === e.currentTarget)
     (e.currentTarget as HTMLElement).classList.add("hidden");
+});
+
+// Restart toast undo
+document.getElementById("restart-toast-undo")?.addEventListener("click", () => {
+  if (pendingRestartTimeout) {
+    clearTimeout(pendingRestartTimeout);
+    pendingRestartTimeout = null;
+    pendingRestartId = null;
+  }
+  document.getElementById("restart-toast")?.classList.add("hidden");
+  showBanner("welcome-banner", "Restart cancelled", 2000);
 });
 
 // Settings toggles
@@ -1418,6 +1711,9 @@ document.getElementById("toggle-show-onboarding")!.addEventListener("change", (e
 document.getElementById("release-channel")!.addEventListener("change", (e) => {
   const channel = (e.target as HTMLSelectElement).value as "stable" | "beta";
   send({ type: "update:channel:set", channel });
+});
+document.getElementById("btn-settings-pick-dir")!.addEventListener("click", () => {
+  send({ type: "dialog:pick-folder", callbackId: "settings-datadir" });
 });
 document.getElementById("app-search")!.addEventListener("input", (e) => {
   const value = (e.target as HTMLInputElement).value;

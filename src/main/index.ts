@@ -1,51 +1,38 @@
-// src/main/index.ts
-import { BrowserWindow, Tray, ApplicationMenu } from "electrobun/bun";
-import { tmpdir, homedir, cpus, loadavg } from "os";
+import { BrowserWindow, Tray, ApplicationMenu, Utils } from "electrobun/bun";
+import { tmpdir, cpus, loadavg } from "os";
 import { join } from "path";
-import { writeFileSync, mkdirSync, chmodSync, rmSync, readdirSync, readFileSync } from "fs";
-import type { ContainerStatus, DockerApp, IpcMessage } from "../shared/types";
+import { writeFileSync } from "fs";
+import type { DockerApp, IpcMessage } from "../shared/types";
 import { loadRegistry, registryExists, saveRegistry } from "./registry";
 import {
-  getContainerHealth,
-  getContainerMetrics,
+  getContainerHealthBatch,
+  getContainerMetricsBatch,
   isDockerAvailable,
   startDockerDaemon,
-  launchApp,
-  stopApp,
-  removeAppVolumes,
-  removeAppImage,
   checkImageUpdateAvailable,
-  listDockerNetworks,
-  createDockerNetwork,
 } from "./docker";
-import { normalizeName } from "../shared/validation";
-import { importComposeAsApps } from "./compose";
-import { getPopularImages, searchImages, fetchAllOgImages } from "./dockerhub";
-import { presetForImage } from "../shared/presets";
+import { fetchAllOgImages } from "./dockerhub";
 import { loadMetricsHistory, saveMetricsHistory } from "./metrics-store";
 import { loadSettings, saveSettings, type WindowBounds } from "./settings";
+import { nextUnhealthyStreak, shouldRestartUnhealthy } from "./health-recovery";
+import { appendErrorEntry } from "./error-report";
+import { checkForUpdate } from "./updater";
+import { resolveKeychainEnv } from "./keychain";
+import { launchApp, stopApp } from "./docker";
 import {
-  nextUnhealthyStreak,
-  shouldRestartUnhealthy,
-} from "./health-recovery";
-import {
-  appendErrorEntry,
-  formatErrorExport,
-  loadRecentErrors,
-} from "./error-report";
-import {
-  checkForUpdate,
-  downloadUpdate,
-  applyUpdate,
-  type ReleaseInfo,
-} from "./updater";
-import { keychainSet, keychainDelete, resolveKeychainEnv } from "./keychain";
-import { openWebUiWindow, closeWebUiWindow } from "./webui";
-import { Utils } from "electrobun/bun";
-import { validateOpenUrl } from "../shared/validation";
+  CURRENT_VERSION,
+  UPDATE_CHECK_INTERVAL_MS,
+  LAUNCH_SERVER_PORT,
+  LOCAL_PROXY_PORT,
+} from "./constants";
+import { openWebUiWindow } from "./webui";
+import type { AppState, HandlerContext } from "./ipc-handlers/context";
+import { handleApps } from "./ipc-handlers/apps";
+import { handleSettings } from "./ipc-handlers/settings";
+import { handleUpdater } from "./ipc-handlers/updater";
+import { handleRegistry } from "./ipc-handlers/registry";
 
-// Tray icon embedded as base64 so it survives app-bundle packaging
-// (assets/ is not copied into the .app bundle at build time).
+// ── Tray icon ─────────────────────────────────────────────────────────────────
 const TRAY_ICON_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAGyElEQVR42q1XXWxcVxH+Zs69ex1vdmPtKvHe" +
   "uxvsKA5NESUIWkAIKAEpoj+QCoosEUKrouYFqAQvNEoVqYIoidSHliJB1QpFgIoCEULQhrZUjVzgraEKUh3k" +
@@ -77,57 +64,194 @@ const TRAY_ICON_B64 =
   "op1EdICI7lPVnngmWE5sFgG8o6p/Msb8emRk5GJ6rLvV4fS/f+7q6mpzzn1ERD5MRNvi6qdENKGqF0TkXK1W" +
   "e2fJf9c1nP4HWCA+QSNCyegAAAAASUVORK5CYII=";
 
-// Write once at process start into OS temp dir (survives bundle packaging)
 const TRAY_ICON_PATH = join(tmpdir(), "loading-dock-tray.png");
 writeFileSync(TRAY_ICON_PATH, Buffer.from(TRAY_ICON_B64, "base64"));
+const WINDOWS_TOAST_SCRIPT_PATH = join(tmpdir(), "loading-dock-toast.ps1");
+writeFileSync(
+  WINDOWS_TOAST_SCRIPT_PATH,
+  `
+param(
+  [string]$TitleB64,
+  [string]$BodyB64
+)
 
-const CURRENT_VERSION = "0.2.0";
-const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 h
+$Title = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($TitleB64))
+$Body = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($BodyB64))
 
-let apps: DockerApp[] = [];
+[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType=WindowsRuntime] | Out-Null
+$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
+$template.GetElementsByTagName('text')[0].AppendChild($template.CreateTextNode($Title)) | Out-Null
+$template.GetElementsByTagName('text')[1].AppendChild($template.CreateTextNode($Body)) | Out-Null
+$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('The Loading Dock(r)')
+$notifier.Show([Windows.UI.Notifications.ToastNotification]::new($template))
+  `.trim(),
+);
+function getPodmanInstallUrl(): string {
+  if (process.platform === "darwin") {
+    return "https://podman.io/getting-started/installation#macos";
+  }
+  if (process.platform === "win32") {
+    return "https://podman.io/getting-started/installation#windows";
+  }
+  return "https://podman.io/docs/installation";
+}
+
+function getPodmanStateHint(
+  context: "first-run" | "unavailable",
+): { message: string; detail: string } {
+  if (process.platform === "darwin") {
+    if (context === "first-run") {
+      return {
+        message: "Podman is not installed.",
+        detail: "Install Podman Desktop from podman.io, or run brew install podman in Terminal, then click Retry.",
+      };
+    }
+    return {
+      message: "Podman is not responding.",
+      detail: "Podman Desktop may have quit or the VM stopped. Open Podman Desktop, then click Retry.",
+    };
+  }
+  if (process.platform === "win32") {
+    if (context === "first-run") {
+      return {
+        message: "Podman is not installed.",
+        detail: "Install Podman Desktop (includes WSL2 and podman machine setup), then click Retry.",
+      };
+    }
+    return {
+      message: "Podman is not responding.",
+      detail: "The Podman machine may have stopped. Click Retry to start it, or open Podman Desktop.",
+    };
+  }
+  // Linux
+  if (context === "first-run") {
+    return {
+      message: "Podman is not installed.",
+      detail: "Install Podman with your package manager (sudo apt install podman, sudo dnf install podman, etc.), then click Retry.",
+    };
+  }
+  return {
+    message: "Podman is not responding.",
+    detail: "The Podman service may have stopped. Try sudo systemctl start podman or click Retry.",
+  };
+}
+
+// ── Process-level state ───────────────────────────────────────────────────────
+
 let launcherWindow: InstanceType<typeof BrowserWindow> | null = null;
+let launcherReady = false;
 const appWindows = new Map<string, InstanceType<typeof BrowserWindow>>();
 const logHistory = new Map<string, string[]>();
-const metricsHistory = new Map<
-  string,
-  { id: string; cpuPercent: number; memUsageMB: number; timestamp: number }[]
->();
 let dockerAvailable = false;
 let isFirstRun = false;
-let secretsMaskingEnabled = true;
-let releaseChannel: "stable" | "beta" = "stable";
-let notificationsEnabled = true;
-let keychainSecretsEnabled = false;
-let autoRestartOnUnhealthy = true;
-let errorLoggingEnabled = true;
-let openAtLogin = false;
-let autoCheckUpdates = true;
-let theme: "dark" | "light" = "dark";
-let showOnboarding = true;
-let dataDir = "~/.loading-dock";
-let windowBounds: WindowBounds = { x: 100, y: 80, width: 920, height: 640 };
+let pendingTrayBulkAction: "stop-all" | "restart-all" | null = null;
+let startupRestoreIds = new Set<string>();
+let dockerStartPromise: Promise<void> | null = null;
 
-// System defaults — resolved once at startup, never change
-const systemUid = String((process as any).getuid?.() ?? 1000);
-const systemGid = String((process as any).getgid?.() ?? 1000);
-const systemTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-let _pendingUpdate: ReleaseInfo | null = null;
-// Apps waiting to have their web UI window opened once the container is running
-const pendingWebUiOpen = new Set<string>();
-const unhealthyStreaks = new Map<string, number>();
-const healthRestartInProgress = new Set<string>();
-
-// Cache: docker image reference → og:image URL (persists for the process lifetime)
+// ogCache persists for the process lifetime; shared with broadcastOgImages()
 const ogCache = new Map<string, string>();
 
-/**
- * Fetch og:image URLs for all current apps, send any results to the launcher.
- * Already-cached entries are sent immediately; new ones are fetched in the background.
- */
-function broadcastOgImages() {
-  const refs = [...new Set(apps.map((a) => a.image))];
+// Shared mutable state object — passed by reference to all handler modules
+const state: AppState = {
+  apps: [],
+  secretsMaskingEnabled: true,
+  keychainSecretsEnabled: false,
+  autoRestartOnUnhealthy: true,
+  errorLoggingEnabled: true,
+  notificationsEnabled: true,
+  openAtLogin: false,
+  autoCheckUpdates: true,
+  theme: "dark",
+  showOnboarding: true,
+  dataDir: "~/.loading-dock",
+  releaseChannel: "stable",
+  pendingUpdate: null,
+  pendingWebUiOpen: new Set(),
+  metricsHistory: new Map(),
+  unhealthyStreaks: new Map(),
+  healthRestartInProgress: new Set(),
+  systemUid: String((process as any).getuid?.() ?? 1000),
+  systemGid: String((process as any).getgid?.() ?? 1000),
+  systemTz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+};
 
-  // Send already-cached results right away
+let windowBounds: WindowBounds = { x: 100, y: 80, width: 920, height: 640 };
+
+// ── Core messaging ────────────────────────────────────────────────────────────
+
+function broadcast(message: IpcMessage) {
+  if (message.type === "app:status" || message.type === "apps:list") {
+    updateTrayMenu();
+  }
+  if (message.type === "app:status") {
+    void saveRegistry(state.apps);
+  }
+  if (message.type === "error") {
+    recordError("ui:error", message.message);
+  }
+  if (message.type === "docker:log") {
+    const logs = logHistory.get(message.id) ?? [];
+    logs.push(message.line);
+    if (logs.length > 1000) logs.shift();
+    logHistory.set(message.id, logs);
+  }
+  if (message.type === "app:status" && state.notificationsEnabled) {
+    const app = state.apps.find((a) => a.id === message.id);
+    const name = app?.name ?? message.id;
+    if (message.status === "error") {
+      sendNativeNotification("The Loading Dock(r)", `${name} entered an error state.`);
+      broadcast({ type: "error", message: `App ${name} entered error state.` });
+    } else if (message.status === "stopped" && app?.status !== "stopping") {
+      sendNativeNotification("The Loading Dock(r)", `${name} stopped unexpectedly.`);
+    }
+  }
+  sendToLauncher(message);
+  for (const win of appWindows.values()) safeSend(win.webview, message);
+}
+
+function sendToLauncher(message: IpcMessage) {
+  if (!launcherWindow) return;
+  safeSend(launcherWindow.webview, message);
+}
+
+function requestTrayBulkAction(action: "stop-all" | "restart-all") {
+  openLauncher();
+  if (!launcherReady) {
+    pendingTrayBulkAction = action;
+    return;
+  }
+  sendToLauncher({ type: "tray:bulk-action-request", action });
+}
+
+function flushPendingTrayBulkAction() {
+  if (!launcherReady || !pendingTrayBulkAction) return;
+  const action = pendingTrayBulkAction;
+  pendingTrayBulkAction = null;
+  sendToLauncher({ type: "tray:bulk-action-request", action });
+}
+
+function safeSend(webview: unknown, message: IpcMessage) {
+  const rpc = (webview as any)?.rpc;
+  if (rpc?.send) {
+    try { rpc.send["ipc-message"](message); return; } catch {}
+  }
+  const sender = (webview as { send?: (n: string, p: IpcMessage) => void })?.send;
+  if (typeof sender === "function") sender("ipc-message", message);
+}
+
+function recordError(source: string, text: string, appId?: string) {
+  if (!state.errorLoggingEnabled) return;
+  appendErrorEntry({
+    timestamp: Date.now(),
+    level: "error",
+    source,
+    message: text,
+    appId,
+  }).catch(() => undefined);
+}
+
+function broadcastOgImages() {
+  const refs = [...new Set(state.apps.map((a) => a.image))];
   const cached: Record<string, string> = {};
   const uncached: string[] = [];
   for (const ref of refs) {
@@ -138,8 +262,6 @@ function broadcastOgImages() {
   if (Object.keys(cached).length > 0) {
     sendToLauncher({ type: "dockerhub:og-images", results: cached });
   }
-
-  // Fetch uncached ones without blocking
   if (uncached.length > 0) {
     fetchAllOgImages(uncached)
       .then((results) => {
@@ -148,34 +270,246 @@ function broadcastOgImages() {
           sendToLauncher({ type: "dockerhub:og-images", results });
         }
       })
-      .catch(() => {/* best-effort */});
+      .catch(() => {});
   }
 }
 
+function broadcastSettingsState() {
+  sendToLauncher({
+    type: "settings:state",
+    autoRestartOnUnhealthy: state.autoRestartOnUnhealthy,
+    errorLoggingEnabled: state.errorLoggingEnabled,
+    openAtLogin: state.openAtLogin,
+    autoCheckUpdates: state.autoCheckUpdates,
+    theme: state.theme,
+    secretsMaskingEnabled: state.secretsMaskingEnabled,
+    keychainSecretsEnabled: state.keychainSecretsEnabled,
+    showOnboarding: state.showOnboarding,
+    dataDir: state.dataDir,
+    systemUid: state.systemUid,
+    systemGid: state.systemGid,
+    systemTz: state.systemTz,
+  });
+}
+
+// ── Handler context (shared by all IPC handler modules) ───────────────────────
+
+const ctx: HandlerContext = {
+  state,
+  broadcast,
+  recordError,
+  broadcastOgImages,
+  broadcastSettingsState,
+  openAppWindow,
+  restartAppForHealth,
+};
+
+// ── IPC router ────────────────────────────────────────────────────────────────
+
+async function handleIpc(message: IpcMessage) {
+  if (message.type === "docker:retry") {
+    void ensureDockerRunning();
+    return;
+  }
+  if (message.type === "docker:start-if-needed") {
+    if (!dockerAvailable) void ensureDockerRunning();
+    return;
+  }
+  if (message.type === "podman:install") {
+    Utils.openExternal(getPodmanInstallUrl());
+    return;
+  }
+  if (await handleApps(message, ctx)) return;
+  if (await handleSettings(message, ctx)) return;
+  if (await handleUpdater(message, ctx)) return;
+  if (await handleRegistry(message, ctx)) return;
+}
+
+// ── Window management ─────────────────────────────────────────────────────────
+
+function openLauncher() {
+  if (launcherWindow) { launcherWindow.show(); return; }
+  launcherReady = false;
+  launcherWindow = new BrowserWindow({
+    title: "The Loading Dock(r)",
+    url: "views://launcher/index.html",
+    frame: windowBounds,
+  } as any);
+
+  let saveBoundsDebounce: ReturnType<typeof setTimeout> | null = null;
+  const persistBounds = (bounds: WindowBounds) => {
+    windowBounds = bounds;
+    if (saveBoundsDebounce) clearTimeout(saveBoundsDebounce);
+    saveBoundsDebounce = setTimeout(() => void saveSettings({ windowBounds: bounds }), 500);
+  };
+  launcherWindow.on("resize", (e: any) => {
+    const { x, y, width, height } = e as WindowBounds;
+    persistBounds({ x, y, width, height });
+  });
+  launcherWindow.on("move", (e: any) => {
+    const { x, y, width, height } = e as WindowBounds;
+    persistBounds({ x, y, width, height });
+  });
+
+  launcherWindow.webview.on("dom-ready", () => {
+    launcherReady = true;
+    sendToLauncher({ type: "apps:list", apps: state.apps });
+    sendToLauncher({
+      type: "docker:availability",
+      available: dockerAvailable,
+      message: dockerAvailable
+        ? undefined
+        : getPodmanStateHint(isFirstRun ? "first-run" : "unavailable").message,
+      detail: dockerAvailable
+        ? undefined
+        : getPodmanStateHint(isFirstRun ? "first-run" : "unavailable").detail,
+      canRetry: !dockerAvailable,
+      canInstall: !dockerAvailable,
+    });
+    sendToLauncher({
+      type: "onboarding:state",
+      firstRun: isFirstRun,
+      showOnboarding: state.showOnboarding,
+      dataDir: state.dataDir,
+      systemUid: state.systemUid,
+      systemGid: state.systemGid,
+      systemTz: state.systemTz,
+    });
+    sendToLauncher({ type: "update:state", channel: state.releaseChannel });
+    if (state.pendingUpdate) {
+      sendToLauncher({
+        type: "update:available",
+        version: state.pendingUpdate.version,
+        releaseNotes: state.pendingUpdate.releaseNotes,
+        downloadUrl: state.pendingUpdate.downloadUrl,
+        channel: state.pendingUpdate.channel,
+      });
+    }
+    broadcastSettingsState();
+    broadcastOgImages();
+    void handleIpc({ type: "networks:list" } as IpcMessage);
+    flushPendingTrayBulkAction();
+  });
+  (launcherWindow.webview as any).rpc.addMessageListener(
+    "ipc-message",
+    async (message: IpcMessage) => await handleIpc(message),
+  );
+  launcherWindow.on("close", () => {
+    launcherWindow = null;
+    launcherReady = false;
+    pendingTrayBulkAction = null;
+  });
+
+  if (!dockerAvailable) void ensureDockerRunning();
+}
+
+function openAppWindow(app: DockerApp) {
+  if (appWindows.has(app.id)) { appWindows.get(app.id)!.show(); return; }
+  const win = new BrowserWindow({
+    title: app.name,
+    url: "views://app-window/index.html",
+    frame: { x: 140, y: 120, width: 820, height: 580 },
+  } as any);
+  win.webview.on("dom-ready", () => {
+    safeSend(win.webview, { type: "app:open-window", app });
+    safeSend(win.webview, {
+      type: "docker:logs:history",
+      id: app.id,
+      lines: logHistory.get(app.id) ?? [],
+    });
+    safeSend(win.webview, { type: "secrets:mask", enabled: state.secretsMaskingEnabled });
+    safeSend(win.webview, {
+      type: "metrics:history",
+      id: app.id,
+      points: state.metricsHistory.get(app.id) ?? [],
+    });
+  });
+  (win.webview as any).rpc.addMessageListener(
+    "ipc-message",
+    async (message: IpcMessage) => await handleIpc(message),
+  );
+  win.on("close", () => appWindows.delete(app.id));
+  appWindows.set(app.id, win);
+}
+
+// ── Health-restart (needs broadcast + launch/stop + state) ────────────────────
+
+async function restartAppForHealth(app: DockerApp) {
+  if (state.healthRestartInProgress.has(app.id)) return;
+  state.healthRestartInProgress.add(app.id);
+  state.unhealthyStreaks.set(app.id, 0);
+  try {
+    broadcast({ type: "app:health-restart", id: app.id, name: app.name });
+    recordError(
+      "health:restart",
+      `Restarting ${app.name} after repeated unhealthy health checks`,
+      app.id,
+    );
+    sendNativeNotification("The Loading Dock(r)", `${app.name} was unhealthy — restarting container`);
+    await stopApp(app, (id, status) => {
+      const t = state.apps.find((a) => a.id === id);
+      if (t) t.status = status;
+      broadcast({ type: "app:status", id, status });
+    });
+    const fresh = state.apps.find((a) => a.id === app.id);
+    if (!fresh) return;
+    const resolvedEnv = state.keychainSecretsEnabled
+      ? await resolveKeychainEnv(fresh.id, fresh.env, fresh.keychainEnvKeys)
+      : undefined;
+    await launchApp(
+      fresh,
+      (id, status, containerId) => {
+        const t = state.apps.find((a) => a.id === id);
+        if (t) { t.status = status; t.containerId = containerId; }
+        broadcast({ type: "app:status", id, status, containerId });
+      },
+      (id, line) => broadcast({ type: "docker:log", id, line }),
+      (id, sts, detail) => broadcast({ type: "app:pull-progress", id, status: sts, detail }),
+      resolvedEnv,
+    );
+  } catch (err) {
+    recordError("health:restart", String(err), app.id);
+    broadcast({ type: "error", message: `Health restart failed for ${app.name}: ${String(err)}` });
+  } finally {
+    state.healthRestartInProgress.delete(app.id);
+  }
+}
+
+// ── Startup ───────────────────────────────────────────────────────────────────
+
 async function main() {
   isFirstRun = !(await registryExists());
-  apps = await loadRegistry();
+  state.apps = await loadRegistry();
+  startupRestoreIds = new Set(
+    state.apps.filter((app) => app.status === "running").map((app) => app.id),
+  );
+  for (const app of state.apps) {
+    app.status = "stopped";
+    app.containerId = undefined;
+  }
+
   const persistedMetrics = await loadMetricsHistory();
   for (const [id, points] of Object.entries(persistedMetrics)) {
-    metricsHistory.set(id, points);
+    state.metricsHistory.set(id, points);
   }
+
   const settings = await loadSettings();
-  releaseChannel = settings.releaseChannel;
-  notificationsEnabled = settings.notificationsEnabled;
-  secretsMaskingEnabled = settings.secretsMaskingEnabled;
-  keychainSecretsEnabled = settings.keychainSecretsEnabled;
-  autoRestartOnUnhealthy = settings.autoRestartOnUnhealthy;
-  errorLoggingEnabled = settings.errorLoggingEnabled;
-  openAtLogin = settings.openAtLogin ?? false;
-  autoCheckUpdates = settings.autoCheckUpdates ?? true;
-  theme = settings.theme ?? "dark";
-  showOnboarding = settings.showOnboarding ?? true;
-  dataDir = settings.dataDir ?? "~/.loading-dock";
+  state.releaseChannel = settings.releaseChannel;
+  state.notificationsEnabled = settings.notificationsEnabled;
+  state.secretsMaskingEnabled = settings.secretsMaskingEnabled;
+  state.keychainSecretsEnabled = settings.keychainSecretsEnabled;
+  state.autoRestartOnUnhealthy = settings.autoRestartOnUnhealthy;
+  state.errorLoggingEnabled = settings.errorLoggingEnabled;
+  state.openAtLogin = settings.openAtLogin ?? false;
+  state.autoCheckUpdates = settings.autoCheckUpdates ?? true;
+  state.theme = settings.theme ?? "dark";
+  state.showOnboarding = settings.showOnboarding ?? true;
+  state.dataDir = settings.dataDir ?? "~/.loading-dock";
   if (settings.windowBounds) windowBounds = settings.windowBounds;
+
   dockerAvailable = await isDockerAvailable();
 
   setupProcessErrorHandlers();
-
   startLaunchServer();
   setupTray();
   setupMenu();
@@ -186,58 +520,67 @@ async function main() {
   startLocalDomainProxy();
   scheduleStartupUpdateCheck();
 
-  // If Docker is not yet running, attempt to start it in the background
-  // so the UI is never blocked. The launcher receives a docker:availability
-  // update the moment the daemon responds.
-  if (!dockerAvailable) {
-    console.log(
-      "[loading-dock] Docker not running — attempting to start daemon…",
-    );
-    void ensureDockerRunning();
-  } else {
-    // Docker is already running — launch all apps immediately
+  if (dockerAvailable) {
     void autoLaunchAllApps();
   }
 }
 
-/** Launches every installed app in parallel on startup. */
 async function autoLaunchAllApps() {
-  if (apps.length === 0) return;
-  console.log(`[loading-dock] Auto-launching ${apps.length} installed app(s)…`);
+  const appsToRestore = state.apps.filter((app) => startupRestoreIds.has(app.id));
+  if (appsToRestore.length === 0) return;
+  console.log(`[loading-dock] Restoring ${appsToRestore.length} running app(s)…`);
   await Promise.allSettled(
-    apps.map((app) => handleIpc({ type: "app:launch", id: app.id })),
+    appsToRestore.map((app) => handleIpc({ type: "app:launch", id: app.id })),
   );
+  startupRestoreIds.clear();
 }
 
-/** Starts the Docker daemon and notifies the launcher when it becomes ready. */
 async function ensureDockerRunning() {
-  const ready = await startDockerDaemon();
-  if (ready) {
-    dockerAvailable = true;
-    sendToLauncher({ type: "docker:availability", available: true });
-    console.log("[loading-dock] Docker daemon is now ready.");
-    void autoLaunchAllApps();
-  } else {
-    console.error(
-      "[loading-dock] Docker daemon did not become ready within the timeout.",
-    );
-  }
+  if (dockerStartPromise) return dockerStartPromise;
+  dockerStartPromise = (async () => {
+  sendToLauncher({
+    type: "docker:availability",
+    available: false,
+    message: "Starting Podman — please wait…",
+    canRetry: false,
+    canInstall: false,
+  });
+    const ready = await startDockerDaemon();
+    if (ready) {
+      dockerAvailable = true;
+      sendToLauncher({ type: "docker:availability", available: true, canRetry: false });
+      console.log("[loading-dock] Podman is ready.");
+      void autoLaunchAllApps();
+    } else {
+      console.error("[loading-dock] Podman did not become ready within the timeout.");
+      sendToLauncher({
+        type: "docker:availability",
+        available: false,
+        ...getPodmanStateHint("unavailable"),
+        canRetry: true,
+        canInstall: true,
+      });
+    }
+  })().finally(() => {
+    dockerStartPromise = null;
+  });
+  return dockerStartPromise;
 }
 
 async function scheduleStartupUpdateCheck() {
-  if (!autoCheckUpdates) return;
+  if (!state.autoCheckUpdates) return;
   const settings = await loadSettings();
   const sinceLastCheck = Date.now() - (settings.lastUpdateCheckAt ?? 0);
   if (sinceLastCheck < UPDATE_CHECK_INTERVAL_MS) return;
-  // Small delay so the launcher window is ready to receive the message
   setTimeout(() => {
-    checkForUpdate(CURRENT_VERSION, releaseChannel, async (result) => {
+    checkForUpdate(CURRENT_VERSION, state.releaseChannel, async (result) => {
       if (result.type === "available") {
-        _pendingUpdate = result.info;
+        state.pendingUpdate = result.info;
         broadcast({
           type: "update:available",
           version: result.info.version,
           releaseNotes: result.info.releaseNotes,
+          downloadUrl: result.info.downloadUrl,
           channel: result.info.channel,
         });
       }
@@ -246,35 +589,81 @@ async function scheduleStartupUpdateCheck() {
   }, 3000);
 }
 
-function sendNativeNotification(title: string, body: string) {
-  try {
-    if (process.platform === "darwin") {
-      Bun.spawn(["osascript", "-e",
-        `display notification "${body.replace(/"/g, '\\"')}" with title "${title.replace(/"/g, '\\"')}"`]);
-    } else if (process.platform === "linux") {
-      Bun.spawn(["notify-send", title, body]);
-    } else if (process.platform === "win32") {
-      const script = `
-        [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType=WindowsRuntime] | Out-Null
-        $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
-        $template.GetElementsByTagName('text')[0].AppendChild($template.CreateTextNode('${title.replace(/'/g, "''")}')) | Out-Null
-        $template.GetElementsByTagName('text')[1].AppendChild($template.CreateTextNode('${body.replace(/'/g, "''")}')) | Out-Null
-        $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('The Loading Dock(r)')
-        $notifier.Show([Windows.UI.Notifications.ToastNotification]::new($template))
-      `.trim();
-      Bun.spawn(["powershell", "-NoProfile", "-Command", script]);
+function setupProcessErrorHandlers() {
+  process.on("uncaughtException", (err) => recordError("process:uncaughtException", String(err)));
+  process.on("unhandledRejection", (reason) => recordError("process:unhandledRejection", String(reason)));
+}
+
+// ── Polling loops ─────────────────────────────────────────────────────────────
+
+function startRuntimeTelemetry() {
+  let telemetryInFlight = false;
+  setInterval(async () => {
+    if (telemetryInFlight) return;
+    telemetryInFlight = true;
+    try {
+      const running = state.apps.filter((a) => a.status === "running");
+      if (running.length === 0) return;
+      const [healthMap, metricsMap] = await Promise.all([
+        getContainerHealthBatch(running),
+        getContainerMetricsBatch(running),
+      ]);
+      for (const app of running) {
+        const health = healthMap.get(app.id) ?? "unknown";
+        const target = state.apps.find((a) => a.id === app.id);
+        if (target) target.health = health;
+        broadcast({ type: "app:health", id: app.id, health });
+
+        const prevStreak = state.unhealthyStreaks.get(app.id) ?? 0;
+        const streak = nextUnhealthyStreak(health, prevStreak);
+        state.unhealthyStreaks.set(app.id, streak);
+        if (shouldRestartUnhealthy(app, health, streak, state.autoRestartOnUnhealthy)) {
+          void restartAppForHealth(app);
+        }
+
+        const metrics = metricsMap.get(app.id);
+        if (metrics) {
+          const point = {
+            id: app.id,
+            cpuPercent: metrics.cpuPercent,
+            memUsageMB: metrics.memUsageMB,
+            timestamp: Date.now(),
+          };
+          const list = state.metricsHistory.get(app.id) ?? [];
+          list.push(point);
+          const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          const trimmed = list.filter((p) => p.timestamp >= cutoff).slice(-5000);
+          state.metricsHistory.set(app.id, trimmed);
+          saveMetricsHistory(Object.fromEntries(state.metricsHistory)).catch(() => undefined);
+          broadcast({ type: "app:metrics", point });
+        }
+      }
+    } finally {
+      telemetryInFlight = false;
     }
-  } catch {
-    // Notifications are best-effort; never crash the main process
+  }, 5000);
+}
+
+async function checkAllImageUpdates() {
+  const PARALLEL = 3;
+  for (let i = 0; i < state.apps.length; i += PARALLEL) {
+    await Promise.all(
+      state.apps.slice(i, i + PARALLEL).map(async (app) => {
+        const available = await checkImageUpdateAvailable(app);
+        broadcast({ type: "app:image-update", id: app.id, available });
+      }),
+    );
   }
 }
 
+function startImageUpdatePolling() {
+  setTimeout(() => void checkAllImageUpdates(), 30_000);
+  setInterval(() => void checkAllImageUpdates(), 6 * 60 * 60 * 1000);
+}
+
 async function collectSystemMetrics(): Promise<{ cpuPercent: number; gpuPercent: number | null }> {
-  // CPU: normalise 1-minute load average against logical CPU count → 0-100%
   const cpuCount = cpus().length || 1;
   const cpuPercent = Math.min(100, Math.round((loadavg()[0] / cpuCount) * 100));
-
-  // GPU: macOS only — ioreg exposes Device Utilization % without sudo on Intel/AMD GPUs
   let gpuPercent: number | null = null;
   if (process.platform === "darwin") {
     try {
@@ -287,30 +676,21 @@ async function collectSystemMetrics(): Promise<{ cpuPercent: number; gpuPercent:
         out.match(/"Device Utilization %"\s*=\s*(\d+)/) ??
         out.match(/"Renderer Utilization"\s*=\s*(\d+)/);
       if (m) gpuPercent = Number(m[1]);
-    } catch {
-      // GPU data not accessible — leave as null
-    }
+    } catch {}
   }
-
   return { cpuPercent, gpuPercent };
 }
 
-// ── Image update polling (feature 1) ──────────────────────────
-async function checkAllImageUpdates() {
-  for (const app of apps) {
-    const available = await checkImageUpdateAvailable(app);
-    broadcast({ type: "app:image-update", id: app.id, available });
-  }
+function startSystemMetricsPolling() {
+  const poll = async () => {
+    const metrics = await collectSystemMetrics();
+    broadcast({ type: "system:metrics", ...metrics });
+  };
+  void poll();
+  setInterval(() => void poll(), 4000);
 }
 
-function startImageUpdatePolling() {
-  // Check on startup (after a short delay so Docker is ready), then every 6 hours
-  setTimeout(() => void checkAllImageUpdates(), 30_000);
-  setInterval(() => void checkAllImageUpdates(), 6 * 60 * 60 * 1000);
-}
-
-// ── Local domain reverse proxy (feature 10) ───────────────────
-const LOCAL_PROXY_PORT = 17300;
+// ── Local domain proxy ────────────────────────────────────────────────────────
 
 function startLocalDomainProxy() {
   try {
@@ -319,7 +699,7 @@ function startLocalDomainProxy() {
       async fetch(req) {
         const hostHeader = req.headers.get("host") ?? "";
         const subdomain = hostHeader.split(":")[0].replace(/\.localhost$/i, "");
-        const app = apps.find((a) => a.localDomain === subdomain);
+        const app = state.apps.find((a) => a.localDomain === subdomain);
         if (!app) {
           return new Response(
             `<html><body><h2>404 — no app with local domain <code>${subdomain}.localhost</code></h2></body></html>`,
@@ -354,758 +734,73 @@ function startLocalDomainProxy() {
   }
 }
 
-function startSystemMetricsPolling() {
-  const poll = async () => {
-    const metrics = await collectSystemMetrics();
-    broadcast({ type: "system:metrics", ...metrics });
-  };
-  void poll(); // immediate first reading
-  setInterval(() => void poll(), 4000);
-}
+// ── Desktop shortcut launch server ────────────────────────────────────────────
 
-function openLauncher() {
-  if (launcherWindow) {
-    launcherWindow.show();
-    return;
-  }
-  launcherWindow = new BrowserWindow({
-    title: "The Loading Dock(r)",
-    url: "views://launcher/index.html",
-    frame: windowBounds,
-  } as any);
-
-  // Persist bounds whenever the user resizes or moves the window
-  let saveBoundsDebounce: ReturnType<typeof setTimeout> | null = null;
-  const persistBounds = (bounds: WindowBounds) => {
-    windowBounds = bounds;
-    if (saveBoundsDebounce) clearTimeout(saveBoundsDebounce);
-    saveBoundsDebounce = setTimeout(() => {
-      void saveSettings({ windowBounds: bounds });
-    }, 500);
-  };
-  launcherWindow.on("resize", (e: any) => {
-    const { x, y, width, height } = e as WindowBounds;
-    persistBounds({ x, y, width, height });
-  });
-  launcherWindow.on("move", (e: any) => {
-    const { x, y, width, height } = e as WindowBounds;
-    persistBounds({ x, y, width, height });
-  });
-
-  launcherWindow.webview.on("dom-ready", () => {
-    sendToLauncher({ type: "apps:list", apps });
-    sendToLauncher({ type: "docker:availability", available: dockerAvailable });
-    sendToLauncher({ type: "onboarding:state", firstRun: isFirstRun, showOnboarding, dataDir, systemUid, systemGid, systemTz });
-    sendToLauncher({ type: "update:state", channel: releaseChannel });
-    broadcastSettingsState();
-    broadcastOgImages();
-  });
-  (launcherWindow.webview as any).rpc.addMessageListener(
-    "ipc-message",
-    async (message: IpcMessage) => await handleIpc(message),
-  );
-  launcherWindow.on("close", () => {
-    launcherWindow = null;
-  });
-}
-
-function openAppWindow(app: DockerApp) {
-  if (appWindows.has(app.id)) {
-    appWindows.get(app.id)!.show();
-    return;
-  }
-  const win = new BrowserWindow({
-    title: app.name,
-    url: "views://app-window/index.html",
-    frame: { x: 140, y: 120, width: 820, height: 580 },
-  } as any);
-  win.webview.on("dom-ready", () =>
-    safeSend(win.webview, { type: "app:open-window", app }),
-  );
-  win.webview.on("dom-ready", () => {
-    safeSend(win.webview, {
-      type: "docker:logs:history",
-      id: app.id,
-      lines: logHistory.get(app.id) ?? [],
-    });
-    safeSend(win.webview, {
-      type: "secrets:mask",
-      enabled: secretsMaskingEnabled,
-    });
-    safeSend(win.webview, {
-      type: "metrics:history",
-      id: app.id,
-      points: metricsHistory.get(app.id) ?? [],
-    });
-  });
-  (win.webview as any).rpc.addMessageListener(
-    "ipc-message",
-    async (message: IpcMessage) => await handleIpc(message),
-  );
-  win.on("close", () => {
-    appWindows.delete(app.id);
-  });
-  appWindows.set(app.id, win);
-}
-
-async function handleIpc(message: IpcMessage) {
-  switch (message.type) {
-    case "app:launch": {
-      const app = apps.find((a) => a.id === message.id);
-      if (!app) return;
-      try {
-        const resolvedEnv = keychainSecretsEnabled
-          ? await resolveKeychainEnv(app.id, app.env, app.keychainEnvKeys)
-          : undefined;
-        await launchApp(
-          app,
-          (id, status, containerId) => {
-            const t = apps.find((a) => a.id === id);
-            if (t) {
-              t.status = status;
-              t.containerId = containerId;
-            }
-            broadcast({ type: "app:status", id, status, containerId });
-            // Auto-open web UI if the app was launched from a desktop shortcut click
-            if (status === "running" && pendingWebUiOpen.has(id)) {
-              pendingWebUiOpen.delete(id);
-              const target = apps.find((a) => a.id === id);
-              if (target?.openUrl) openWebUiWindow(target);
-            }
-            if (status === "error" || status === "stopped") {
-              pendingWebUiOpen.delete(id);
-            }
-          },
-          (id, line) => broadcast({ type: "docker:log", id, line }),
-          (id, status, detail) =>
-            broadcast({ type: "app:pull-progress", id, status, detail }),
-          resolvedEnv,
-        );
-      } catch (err) {
-        const text = "Failed to launch app: " + String(err);
-        recordError("app:launch", text, message.id);
-        broadcast({ type: "error", message: text });
-      }
-      break;
-    }
-    case "update:channel:set": {
-      releaseChannel = message.channel;
-      await saveSettings({ releaseChannel });
-      broadcast({ type: "update:state", channel: releaseChannel });
-      break;
-    }
-    case "update:check": {
-      checkForUpdate(CURRENT_VERSION, releaseChannel, (result) => {
-        if (result.type === "available") {
-          _pendingUpdate = result.info;
-          broadcast({
-            type: "update:available",
-            version: result.info.version,
-            releaseNotes: result.info.releaseNotes,
-            channel: result.info.channel,
-          });
-        } else if (result.type === "not-available") {
-          broadcast({ type: "update:not-available" });
-        } else if (result.type === "error") {
-          const message = "Update check failed: " + result.message;
-          recordError("updater:check", message);
-          broadcast({ type: "error", message });
-        }
-      });
-      break;
-    }
-    case "update:download": {
-      const info: ReleaseInfo = {
-        version: message.version,
-        releaseNotes: "",
-        downloadUrl: message.downloadUrl,
-        channel: message.channel,
-      };
-      downloadUpdate(info, (result) => {
-        if (result.type === "progress") {
-          broadcast({ type: "update:download:progress", percent: result.percent });
-        } else if (result.type === "ready") {
-          broadcast({ type: "update:download:done", localPath: result.localPath });
-        } else if (result.type === "error") {
-          const message = "Download failed: " + result.message;
-          recordError("updater:download", message);
-          broadcast({ type: "error", message });
-        }
-      });
-      break;
-    }
-    case "update:apply": {
-      await applyUpdate(message.localPath);
-      break;
-    }
-    case "secrets:mask": {
-      secretsMaskingEnabled = message.enabled;
-      await saveSettings({ secretsMaskingEnabled });
-      broadcast({ type: "secrets:mask", enabled: secretsMaskingEnabled });
-      break;
-    }
-    case "secrets:keychain": {
-      keychainSecretsEnabled = message.enabled;
-      await saveSettings({ keychainSecretsEnabled });
-      sendToLauncher({
-        type: "notification:show",
-        title: "The Loading Dock(r)",
-        body: `Keychain secrets ${keychainSecretsEnabled ? "enabled" : "disabled"}.`,
-      });
-      break;
-    }
-    case "settings:auto-restart": {
-      autoRestartOnUnhealthy = message.enabled;
-      await saveSettings({ autoRestartOnUnhealthy });
-      broadcastSettingsState();
-      break;
-    }
-    case "settings:error-logging": {
-      errorLoggingEnabled = message.enabled;
-      await saveSettings({ errorLoggingEnabled });
-      broadcastSettingsState();
-      break;
-    }
-    case "onboarding:dismiss": {
-      if (message.noStartup) {
-        showOnboarding = false;
-        await saveSettings({ showOnboarding: false });
-      }
-      break;
-    }
-    case "settings:show-onboarding": {
-      showOnboarding = message.enabled;
-      await saveSettings({ showOnboarding });
-      break;
-    }
-    case "settings:data-dir": {
-      dataDir = message.path;
-      await saveSettings({ dataDir });
-      break;
-    }
-    case "settings:open-at-login": {
-      openAtLogin = message.enabled;
-      await saveSettings({ openAtLogin });
-      // Apply to macOS login items via osascript
-      if (process.platform === "darwin") {
-        const action = openAtLogin ? "make login item" : "delete login item";
-        const appPath = process.execPath.split(".app/")[0] + ".app";
-        const script = openAtLogin
-          ? `tell application "System Events" to make login item at end with properties {path:"${appPath}", hidden:false}`
-          : `tell application "System Events" to delete login item "The Loading Dock(r)"`;
-        Bun.spawn(["osascript", "-e", script]);
-      }
-      break;
-    }
-    case "settings:auto-check-updates": {
-      autoCheckUpdates = message.enabled;
-      await saveSettings({ autoCheckUpdates });
-      break;
-    }
-    case "settings:theme": {
-      theme = message.theme;
-      await saveSettings({ theme });
-      break;
-    }
-    case "errors:export": {
-      const entries = await loadRecentErrors(200);
-      broadcast({
-        type: "errors:exported",
-        json: formatErrorExport(entries),
-      });
-      break;
-    }
-    case "notifications:enabled": {
-      notificationsEnabled = message.enabled;
-      await saveSettings({ notificationsEnabled });
-      break;
-    }
-    case "registry:export": {
-      const serializable = apps.map(
-        ({ status: _s, containerId: _c, ...rest }) => rest,
-      );
-      broadcast({
-        type: "registry:exported",
-        json: JSON.stringify(serializable, null, 2),
-      });
-      break;
-    }
-    case "registry:import": {
-      try {
-        const parsed = JSON.parse(message.json) as Omit<
-          DockerApp,
-          "status" | "containerId"
-        >[];
-        apps = parsed.map((a) => ({ ...a, status: "stopped" as const }));
-        await saveRegistry(apps);
-        broadcast({ type: "apps:list", apps });
-        broadcastOgImages();
-      } catch (err) {
-        const message = "Import failed: " + String(err);
-        recordError("registry:import", message);
-        broadcast({ type: "error", message });
-      }
-      break;
-    }
-    case "app:stop": {
-      const app = apps.find((a) => a.id === message.id);
-      if (!app) return;
-      try {
-        await stopApp(app, (id, status) => {
-          const t = apps.find((a) => a.id === id);
-          if (t) t.status = status;
-          broadcast({ type: "app:status", id, status });
-        });
-        closeWebUiWindow(app.id);
-      } catch (err) {
-        const text = "Failed to stop app: " + String(err);
-        recordError("app:stop", text, message.id);
-        broadcast({ type: "error", message: text });
-      }
-      break;
-    }
-    case "app:restart": {
-      const app = apps.find((a) => a.id === message.id);
-      if (!app) return;
-      try {
-        const statusCb = (id: string, status: ContainerStatus, containerId?: string) => {
-          const t = apps.find((a) => a.id === id);
-          if (t) { t.status = status; t.containerId = containerId; }
-          broadcast({ type: "app:status", id, status, containerId });
-        };
-        await stopApp(app, statusCb);
-        const resolvedEnv = keychainSecretsEnabled
-          ? await resolveKeychainEnv(app.id, app.env, app.keychainEnvKeys)
-          : undefined;
-        await launchApp(app, statusCb,
-          (id, line) => broadcast({ type: "docker:log", id, line }),
-          (id, status, detail) => broadcast({ type: "app:pull-progress", id, status, detail }),
-          resolvedEnv,
-        );
-      } catch (err) {
-        const text = "Failed to restart app: " + String(err);
-        recordError("app:restart", text, message.id);
-        broadcast({ type: "error", message: text });
-      }
-      break;
-    }
-    case "app:open-window": {
-      const app = apps.find((a) => a.id === message.app.id);
-      if (app) openAppWindow(app);
-      break;
-    }
-    case "app:open-webui": {
-      const app = apps.find((a) => a.id === message.id);
-      if (!app) return;
-      const err = openWebUiWindow(app);
-      if (err) broadcast({ type: "error", message: err });
-      break;
-    }
-    case "app:open-external": {
-      const app = apps.find((a) => a.id === message.id);
-      if (!app?.openUrl) return;
-      const url = validateOpenUrl(app.openUrl);
-      if (!url) {
-        broadcast({ type: "error", message: "Invalid Web UI URL." });
-        return;
-      }
-      Utils.openExternal(url);
-      break;
-    }
-    case "app:add": {
-      if (
-        apps.some(
-          (a) =>
-            a.id === message.app.id ||
-            normalizeName(a.name) === normalizeName(message.app.name),
-        )
-      ) {
-        broadcast({
-          type: "error",
-          message: "An app with this name already exists.",
-        });
-        return;
-      }
-      const newApp: DockerApp = { ...message.app, status: "stopped" };
-      const preset = presetForImage(newApp.image);
-      if (preset) {
-        newApp.restartPolicy ??= preset.restartPolicy;
-        newApp.healthcheck ??= preset.healthcheck;
-      }
-      apps.push(newApp);
-      await saveRegistry(apps);
-      broadcast({ type: "apps:list", apps });
-      broadcastOgImages();
-      void createDesktopIcon(newApp);
-      break;
-    }
-    case "app:update": {
-      const idx = apps.findIndex((a) => a.id === message.app.id);
-      if (idx < 0) {
-        broadcast({ type: "error", message: "App not found for update." });
-        return;
-      }
-      const duplicate = apps.some(
-        (a, i) =>
-          i !== idx &&
-          normalizeName(a.name) === normalizeName(message.app.name),
-      );
-      if (duplicate) {
-        broadcast({
-          type: "error",
-          message: "Another app with this name already exists.",
-        });
-        return;
-      }
-      const oldApp = apps[idx];
-      apps[idx] = { ...message.app, status: apps[idx].status };
-      await saveRegistry(apps);
-      broadcast({ type: "apps:list", apps });
-      broadcastOgImages();
-      // If the name changed, remove the old-named shortcut and create a fresh one
-      if (oldApp.name !== message.app.name) {
-        removeDesktopIcon(oldApp);
-        void createDesktopIcon(apps[idx]);
-      }
-      break;
-    }
-    case "app:remove": {
-      const removed = apps.find((a) => a.id === message.id);
-      apps = apps.filter((a) => a.id !== message.id);
-      await saveRegistry(apps);
-      broadcast({ type: "apps:list", apps });
-      if (removed) {
-        removeDesktopIcon(removed);
-        if (message.cleanVolumes) void removeAppVolumes(removed);
-        if (message.cleanImage) void removeAppImage(removed);
-      }
-      break;
-    }
-    case "compose:import": {
-      try {
-        const imported = importComposeAsApps(message.yaml, message.projectName);
-        const existingNames = new Set(apps.map((a) => normalizeName(a.name)));
-        const unique = imported.filter(
-          (a) => !existingNames.has(normalizeName(a.name)),
-        );
-        if (!unique.length) {
-          broadcast({
-            type: "error",
-            message: "No new services to import (names already exist).",
-          });
-          return;
-        }
-        apps.push(...unique.map((a) => ({ ...a, status: "stopped" as const })));
-        await saveRegistry(apps);
-        broadcast({ type: "apps:list", apps });
-      } catch (err) {
-        broadcast({
-          type: "error",
-          message: "Compose import failed: " + String(err),
-        });
-      }
-      break;
-    }
-    case "dockerhub:browse": {
-      try {
-        const images = message.query?.trim()
-          ? await searchImages(message.query)
-          : await getPopularImages();
-        broadcast({
-          type: "dockerhub:results",
-          query: message.query,
-          images,
-        });
-      } catch (err) {
-        broadcast({
-          type: "error",
-          message: "Docker Hub fetch failed: " + String(err),
-        });
-      }
-      break;
-    }
-    case "keychain:set": {
-      try {
-        await keychainSet(message.appId, message.envKey, message.value);
-        // Mark the key as keychain-backed in the app record
-        const app = apps.find((a) => a.id === message.appId);
-        if (app) {
-          app.keychainEnvKeys = Array.from(
-            new Set([...(app.keychainEnvKeys ?? []), message.envKey]),
-          );
-          await saveRegistry(apps);
-        }
-        broadcast({ type: "keychain:set:done", appId: message.appId, envKey: message.envKey });
-      } catch (err) {
-        broadcast({ type: "keychain:error", message: "Keychain write failed: " + String(err) });
-      }
-      break;
-    }
-    case "keychain:delete": {
-      try {
-        await keychainDelete(message.appId, message.envKey);
-        const app = apps.find((a) => a.id === message.appId);
-        if (app) {
-          app.keychainEnvKeys = (app.keychainEnvKeys ?? []).filter(
-            (k) => k !== message.envKey,
-          );
-          await saveRegistry(apps);
-        }
-      } catch {
-        // Best-effort
-      }
-      break;
-    }
-    case "app:reorder": {
-      // message.ids is the new ordered list of app IDs
-      const idOrder = new Map(message.ids.map((id, i) => [id, i]));
-      apps = apps
-        .map((a) => ({ ...a, sortOrder: idOrder.get(a.id) ?? a.sortOrder ?? 999 }))
-        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-      await saveRegistry(apps);
-      broadcast({ type: "apps:list", apps });
-      break;
-    }
-    case "networks:list": {
-      const networks = await listDockerNetworks();
-      broadcast({ type: "networks:listed", networks });
-      break;
-    }
-    case "network:create": {
-      await createDockerNetwork(message.name);
-      const networks = await listDockerNetworks();
-      broadcast({ type: "networks:listed", networks });
-      break;
-    }
-    case "dialog:pick-folder": {
-      if (process.platform !== "darwin") break;
-      try {
-        const result = Bun.spawnSync(
-          ["osascript", "-e", 'POSIX path of (choose folder with prompt "Select folder")'],
-          { stdout: "pipe", stderr: "pipe" },
-        );
-        const path = result.stdout.toString().trim();
-        if (path) {
-          broadcast({ type: "dialog:folder-result", callbackId: message.callbackId, path });
-        } else {
-          broadcast({ type: "dialog:folder-cancelled", callbackId: message.callbackId });
-        }
-      } catch {
-        broadcast({ type: "dialog:folder-cancelled", callbackId: message.callbackId });
-      }
-      break;
-    }
-  }
-}
-
-function recordError(source: string, text: string, appId?: string) {
-  if (!errorLoggingEnabled) return;
-  appendErrorEntry({
-    timestamp: Date.now(),
-    level: "error",
-    source,
-    message: text,
-    appId,
-  }).catch(() => undefined);
-}
-
-function broadcastSettingsState() {
-  sendToLauncher({
-    type: "settings:state",
-    autoRestartOnUnhealthy,
-    errorLoggingEnabled,
-    openAtLogin,
-    autoCheckUpdates,
-    theme,
-    secretsMaskingEnabled,
-    keychainSecretsEnabled,
-    showOnboarding,
-    dataDir,
-    systemUid,
-    systemGid,
-    systemTz,
-  });
-}
-
-function setupProcessErrorHandlers() {
-  process.on("uncaughtException", (err) => {
-    recordError("process:uncaughtException", String(err));
-  });
-  process.on("unhandledRejection", (reason) => {
-    recordError("process:unhandledRejection", String(reason));
-  });
-}
-
-async function restartAppForHealth(app: DockerApp) {
-  if (healthRestartInProgress.has(app.id)) return;
-  healthRestartInProgress.add(app.id);
-  unhealthyStreaks.set(app.id, 0);
+function startLaunchServer() {
   try {
-    broadcast({
-      type: "app:health-restart",
-      id: app.id,
-      name: app.name,
-    });
-    recordError(
-      "health:restart",
-      `Restarting ${app.name} after repeated unhealthy health checks`,
-      app.id,
-    );
-    sendNativeNotification(
-      "The Loading Dock(r)",
-      `${app.name} was unhealthy — restarting container`,
-    );
-    await stopApp(app, (id, status) => {
-      const t = apps.find((a) => a.id === id);
-      if (t) t.status = status;
-      broadcast({ type: "app:status", id, status });
-    });
-    const fresh = apps.find((a) => a.id === app.id);
-    if (!fresh) return;
-    const resolvedEnv = keychainSecretsEnabled
-      ? await resolveKeychainEnv(fresh.id, fresh.env, fresh.keychainEnvKeys)
-      : undefined;
-    await launchApp(
-      fresh,
-      (id, status, containerId) => {
-        const t = apps.find((a) => a.id === id);
-        if (t) {
-          t.status = status;
-          t.containerId = containerId;
+    Bun.serve({
+      port: LAUNCH_SERVER_PORT,
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === "/launch") {
+          const id = url.searchParams.get("id");
+          if (id) {
+            const app = state.apps.find((a) => a.id === id);
+            if (app) {
+              if (app.status === "running") {
+                if (app.openUrl) {
+                  openWebUiWindow(app);
+                } else {
+                  openLauncher();
+                  openAppWindow(app);
+                }
+              } else {
+                if (app.openUrl) state.pendingWebUiOpen.add(id);
+                void handleIpc({ type: "app:launch", id });
+                openLauncher();
+              }
+            }
+          }
+          return new Response("ok");
         }
-        broadcast({ type: "app:status", id, status, containerId });
+        return new Response("not found", { status: 404 });
       },
-      (id, line) => broadcast({ type: "docker:log", id, line }),
-      (id, status, detail) =>
-        broadcast({ type: "app:pull-progress", id, status, detail }),
-      resolvedEnv,
-    );
-  } catch (err) {
-    recordError("health:restart", String(err), app.id);
-    broadcast({
-      type: "error",
-      message: `Health restart failed for ${app.name}: ${String(err)}`,
     });
-  } finally {
-    healthRestartInProgress.delete(app.id);
+  } catch {
+    // Already running — another instance is open
   }
 }
 
-function broadcast(message: IpcMessage) {
-  // Rebuild tray menu whenever app status or list changes
-  if (
-    message.type === "app:status" ||
-    message.type === "apps:list"
-  ) {
-    updateTrayMenu();
-  }
-  if (message.type === "error") {
-    recordError("ui:error", message.message);
-  }
-  if (message.type === "docker:log") {
-    const logs = logHistory.get(message.id) ?? [];
-    logs.push(message.line);
-    if (logs.length > 1000) logs.shift();
-    logHistory.set(message.id, logs);
-  }
-  if (message.type === "app:status" && notificationsEnabled) {
-    const app = apps.find((a) => a.id === message.id);
-    const name = app?.name ?? message.id;
-    if (message.status === "error") {
-      sendNativeNotification("The Loading Dock(r)", `${name} entered an error state.`);
-      broadcast({ type: "error", message: `App ${name} entered error state.` });
-    } else if (message.status === "stopped") {
-      // Only notify unexpected stops (not user-initiated ones)
-      // We detect user-initiated stops by checking if the app was in "stopping"
-      if (app?.status !== "stopping") {
-        sendNativeNotification("The Loading Dock(r)", `${name} stopped unexpectedly.`);
-      }
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+function sendNativeNotification(title: string, body: string) {
+  try {
+    if (process.platform === "darwin") {
+      Bun.spawn(["osascript", "-e",
+        `display notification "${body.replace(/"/g, '\\"')}" with title "${title.replace(/"/g, '\\"')}"`]);
+  } else if (process.platform === "linux") {
+      Bun.spawn(["notify-send", title, body]);
+    } else if (process.platform === "win32") {
+      Bun.spawn([
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        WINDOWS_TOAST_SCRIPT_PATH,
+        Buffer.from(title, "utf8").toString("base64"),
+        Buffer.from(body, "utf8").toString("base64"),
+      ]);
     }
-  }
-  sendToLauncher(message);
-  for (const win of appWindows.values()) safeSend(win.webview, message);
-}
-function sendToLauncher(message: IpcMessage) {
-  if (!launcherWindow) return;
-  safeSend(launcherWindow.webview, message);
+  } catch {}
 }
 
-function safeSend(webview: unknown, message: IpcMessage) {
-  // Electrobun ≥1.18.1: BrowserView exposes rpc.send as a proxy where
-  // rpc.send["channelName"](payload) wraps into the RPC envelope and sends.
-  const rpc = (webview as any)?.rpc;
-  if (rpc?.send) {
-    try {
-      rpc.send["ipc-message"](message);
-      return;
-    } catch {
-      // fall through to legacy path
-    }
-  }
-  // Legacy path (older Electrobun had webview.send directly)
-  const sender = (
-    webview as { send?: (name: string, payload: IpcMessage) => void }
-  )?.send;
-  if (typeof sender === "function") sender("ipc-message", message);
-}
-
-function startRuntimeTelemetry() {
-  setInterval(async () => {
-    const running = apps.filter((a) => a.status === "running");
-    for (const app of running) {
-      const health = await getContainerHealth(app);
-      const target = apps.find((a) => a.id === app.id);
-      if (target) target.health = health;
-      broadcast({ type: "app:health", id: app.id, health });
-
-      const prevStreak = unhealthyStreaks.get(app.id) ?? 0;
-      const streak = nextUnhealthyStreak(health, prevStreak);
-      unhealthyStreaks.set(app.id, streak);
-      if (
-        shouldRestartUnhealthy(
-          app,
-          health,
-          streak,
-          autoRestartOnUnhealthy,
-        )
-      ) {
-        void restartAppForHealth(app);
-      }
-
-      const metrics = await getContainerMetrics(app);
-      if (metrics) {
-        const point = {
-          id: app.id,
-          cpuPercent: metrics.cpuPercent,
-          memUsageMB: metrics.memUsageMB,
-          timestamp: Date.now(),
-        };
-        const list = metricsHistory.get(app.id) ?? [];
-        list.push(point);
-        const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-        const trimmed = list.filter((p) => p.timestamp >= cutoff).slice(-5000);
-        metricsHistory.set(app.id, trimmed);
-        saveMetricsHistory(Object.fromEntries(metricsHistory)).catch(
-          () => undefined,
-        );
-        broadcast({
-          type: "app:metrics",
-          point,
-        });
-      }
-    }
-  }, 5000);
-}
+// ── Tray ──────────────────────────────────────────────────────────────────────
 
 let trayInstance: InstanceType<typeof Tray> | null = null;
 
 function setupTray() {
-  trayInstance = new Tray({
-    image: TRAY_ICON_PATH,
-    template: true,
-    width: 16,
-    height: 16,
-  });
+  trayInstance = new Tray({ image: TRAY_ICON_PATH, template: true, width: 16, height: 16 });
   trayInstance.on("tray-clicked", handleTrayAction);
   updateTrayMenu();
 }
@@ -1114,15 +809,14 @@ function trayDot(status: DockerApp["status"]): string {
   if (status === "running") return "🟢 ";
   if (status === "starting" || status === "stopping") return "🟡 ";
   if (status === "error") return "🔴 ";
-  return "⚫ "; // stopped / offline
+  return "⚫ ";
 }
 
 function updateTrayMenu() {
   if (!trayInstance) return;
-
-  const appItems: any[] = apps.length === 0
+  const appItems: any[] = state.apps.length === 0
     ? [{ type: "normal", label: "No apps installed", enabled: false }]
-    : apps.map((app) => {
+    : state.apps.map((app) => {
         const busy = app.status === "starting" || app.status === "stopping";
         const statusText = app.status === "stopped"
           ? "Offline"
@@ -1136,9 +830,7 @@ function updateTrayMenu() {
           enabled: !busy,
         };
       });
-
-  const hasRunning = apps.some((a) => a.status === "running");
-
+  const hasRunning = state.apps.some((a) => a.status === "running");
   trayInstance.setMenu([
     { type: "normal", label: "Open Dashboard", action: "open-launcher" },
     { type: "separator" },
@@ -1157,192 +849,23 @@ function handleTrayAction(event: unknown) {
   const ev = event as { action?: string; data?: { id?: string } } | undefined;
   const action = ev?.action;
   const id = ev?.data?.id;
-
   if (action === "open-launcher") { openLauncher(); return; }
   if (action === "quit-app") { process.exit(0); }
-
   if (action === "tray-app-click" && id) {
-    const app = apps.find((a) => a.id === id);
+    const app = state.apps.find((a) => a.id === id);
     if (!app) return;
-    if (app.status === "running") {
-      // Already running — bring up its window
-      openLauncher();
-      openAppWindow(app);
-    } else {
-      // Not running — launch it
-      void handleIpc({ type: "app:launch", id });
-    }
+    if (app.status === "running") { openLauncher(); openAppWindow(app); }
+    else void handleIpc({ type: "app:launch", id });
   }
-
   if (action === "tray-stop-all") {
-    for (const app of apps.filter((a) => a.status === "running")) {
-      void handleIpc({ type: "app:stop", id: app.id });
-    }
+    requestTrayBulkAction("stop-all");
   }
   if (action === "tray-restart-all") {
-    for (const app of apps.filter((a) => a.status === "running")) {
-      void handleIpc({ type: "app:restart", id: app.id });
-    }
+    requestTrayBulkAction("restart-all");
   }
 }
 
-// ── Desktop icon helpers ────────────────────────────────────────
-const LAUNCH_SERVER_PORT = 42424;
-
-function startLaunchServer() {
-  try {
-    Bun.serve({
-      port: LAUNCH_SERVER_PORT,
-      fetch(req) {
-        const url = new URL(req.url);
-        if (url.pathname === "/launch") {
-          const id = url.searchParams.get("id");
-          if (id) {
-            const app = apps.find((a) => a.id === id);
-            if (app) {
-              if (app.status === "running") {
-                // Open the web UI as a dedicated desktop app window if URL is set,
-                // otherwise fall back to the logs/metrics panel
-                if (app.openUrl) {
-                  openWebUiWindow(app);
-                } else {
-                  openLauncher();
-                  openAppWindow(app);
-                }
-              } else {
-                // Queue web UI open for when the container is ready
-                if (app.openUrl) pendingWebUiOpen.add(id);
-                void handleIpc({ type: "app:launch", id });
-                openLauncher();
-              }
-            }
-          }
-          return new Response("ok");
-        }
-        return new Response("not found", { status: 404 });
-      },
-    });
-  } catch {
-    // Port may already be in use if another instance is running — silently ignore
-  }
-}
-
-function desktopIconPath(app: DockerApp): string {
-  // Sanitise app name for use as a file/dir name
-  const safe = app.name.replace(/[/\\:*?"<>|]/g, "-");
-  return join(homedir(), "Desktop", `${safe}.app`);
-}
-
-/** Derive a Dashboard Icons CDN slug from a Docker image reference. */
-function iconSlugForApp(image: string): string {
-  let slug = image.replace(/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9._-]+(:\d+)?\//, "");
-  slug = slug.split(":")[0].split("@")[0];
-  slug = (slug.split("/").pop() ?? slug);
-  return slug;
-}
-
-async function createDesktopIcon(app: DockerApp) {
-  if (process.platform !== "darwin") return;
-  try {
-    const appPath = desktopIconPath(app);
-    const contentsPath = join(appPath, "Contents");
-    const macosDir = join(contentsPath, "MacOS");
-    const resourcesDir = join(contentsPath, "Resources");
-    mkdirSync(macosDir, { recursive: true });
-    mkdirSync(resourcesDir, { recursive: true });
-
-    // ── Download icon PNG from Dashboard Icons CDN ──────────────
-    const slug = iconSlugForApp(app.image);
-    const iconPng = join(resourcesDir, "icon.png");
-    const iconIcns = join(resourcesDir, "icon.icns");
-    const iconsetDir = join(resourcesDir, "icon.iconset");
-    let hasIcon = false;
-    try {
-      const resp = await fetch(
-        `https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons@main/png/${slug}.png`,
-      );
-      if (resp.ok) {
-        writeFileSync(iconPng, Buffer.from(await resp.arrayBuffer()));
-        // Build a proper .iconset with all required sizes then convert with iconutil.
-        // sips single-step ICNS conversion is unreliable — Finder often ignores it.
-        mkdirSync(iconsetDir, { recursive: true });
-        let iconsetOk = true;
-        for (const size of [16, 32, 128, 256, 512]) {
-          const r1 = Bun.spawnSync(["sips", "-z", String(size), String(size), iconPng,
-            "--out", join(iconsetDir, `icon_${size}x${size}.png`)]);
-          const r2 = Bun.spawnSync(["sips", "-z", String(size * 2), String(size * 2), iconPng,
-            "--out", join(iconsetDir, `icon_${size}x${size}@2x.png`)]);
-          if (r1.exitCode !== 0 || r2.exitCode !== 0) { iconsetOk = false; break; }
-        }
-        if (iconsetOk) {
-          const { exitCode } = Bun.spawnSync(["iconutil", "-c", "icns", iconsetDir, "-o", iconIcns]);
-          hasIcon = exitCode === 0;
-        }
-        try { rmSync(iconsetDir, { recursive: true, force: true }); } catch {}
-      }
-    } catch {
-      // Icon fetch/convert failed — bundle will use the generic app icon
-      try { rmSync(iconsetDir, { recursive: true, force: true }); } catch {}
-    }
-
-    // ── Info.plist ───────────────────────────────────────────────
-    writeFileSync(
-      join(contentsPath, "Info.plist"),
-      `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleExecutable</key><string>launch</string>
-  <key>CFBundleIdentifier</key><string>com.loadingdock.shortcut.${app.id}</string>
-  <key>CFBundleName</key><string>${app.name}</string>
-  <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>${hasIcon ? `
-  <key>CFBundleIconFile</key><string>icon</string>` : ""}
-  <key>LSUIElement</key><true/>
-  <key>LSBackgroundOnly</key><true/>
-</dict>
-</plist>`,
-    );
-
-    // ── Launcher script ──────────────────────────────────────────
-    const script = join(macosDir, "launch");
-    writeFileSync(
-      script,
-      `#!/bin/bash\ncurl -s "http://localhost:${LAUNCH_SERVER_PORT}/launch?id=${app.id}" &\nopen -a "The Loading Dock(r)"\n`,
-    );
-    chmodSync(script, 0o755);
-  } catch (err) {
-    console.error("Failed to create desktop icon:", err);
-  }
-}
-
-function removeDesktopIcon(app: DockerApp) {
-  if (process.platform !== "darwin") return;
-  // Remove the path derived from the current name (fast path)
-  try {
-    rmSync(desktopIconPath(app), { recursive: true, force: true });
-  } catch {}
-  // Also scan the Desktop for any shortcut whose bundle ID matches this app's
-  // immutable ID. This catches shortcuts left behind after a rename.
-  try {
-    const desktopPath = join(homedir(), "Desktop");
-    const targetBundleId = `com.loadingdock.shortcut.${app.id}`;
-    for (const entry of readdirSync(desktopPath, { withFileTypes: true })) {
-      if (!entry.name.endsWith(".app")) continue;
-      const plistPath = join(desktopPath, entry.name, "Contents", "Info.plist");
-      try {
-        if (readFileSync(plistPath, "utf8").includes(targetBundleId)) {
-          rmSync(join(desktopPath, entry.name), { recursive: true, force: true });
-        }
-      } catch {
-        // Unreadable plist or not one of ours — skip
-      }
-    }
-  } catch {
-    // Desktop not readable — skip
-  }
-}
+// ── Application menu ──────────────────────────────────────────────────────────
 
 function setupMenu() {
   ApplicationMenu.setApplicationMenu([

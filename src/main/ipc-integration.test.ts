@@ -27,6 +27,16 @@ describe("settings IPC contract", () => {
       type: "settings:state",
       autoRestartOnUnhealthy: true,
       errorLoggingEnabled: true,
+      openAtLogin: false,
+      autoCheckUpdates: true,
+      theme: "dark",
+      secretsMaskingEnabled: true,
+      keychainSecretsEnabled: false,
+      showOnboarding: true,
+      dataDir: "~/.loading-dock",
+      systemUid: "1000",
+      systemGid: "1000",
+      systemTz: "UTC",
     };
     expect(msg.type).toBe("settings:state");
   });

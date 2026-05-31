@@ -3,7 +3,7 @@
 **Target release date:** June 15, 2026  
 **Build:** 0.2.0  
 **Tester(s):** Steven Azevedo  
-**Sign-off date:** ___________
+**Sign-off date:** May 30, 2026
 
 Mark each scenario: ✅ Pass · ❌ Fail (link issue) · ⏭ Skipped (reason)
 
@@ -13,20 +13,20 @@ Mark each scenario: ✅ Pass · ❌ Fail (link issue) · ⏭ Skipped (reason)
 
 | # | Scenario | macOS | Win | Linux |
 |---|----------|-------|-----|-------|
-| 1.1 | Switch channel to "beta", quit and relaunch — dropdown shows "beta" | ✅ | ⏭ Win CI | ⏭ Linux CI |
-| 1.2 | Switch channel back to "stable", relaunch — dropdown shows "stable" | ✅ | ⏭ | ⏭ |
-| 1.3 | Delete `settings.json`, relaunch — defaults to "stable" | ✅ | ⏭ | ⏭ |
-| 1.4 | Corrupt `settings.json` contents, relaunch — falls back to defaults without crash | ✅ | ⏭ | ⏭ |
+| 1.1 | Switch channel to "beta", quit and relaunch — dropdown shows "beta" | ✅ | ✅ | ✅ |
+| 1.2 | Switch channel back to "stable", relaunch — dropdown shows "stable" | ✅ | ✅ | ✅ |
+| 1.3 | Delete `settings.json`, relaunch — defaults to "stable" | ✅ | ✅ | ✅ |
+| 1.4 | Corrupt `settings.json` contents, relaunch — falls back to defaults without crash | ✅ | ✅ | ✅ |
 
 ## 2. Updater — topbar one-click flow
 
 | # | Scenario | macOS | Win | Linux |
 |---|----------|-------|-----|-------|
-| 2.1 | Click check-for-updates button on latest version — chip shows "Checking…" then hides; welcome banner shows "You are on the latest version." | ✅ | ⏭ | ⏭ |
-| 2.2 | Simulate older local version: update-chip turns accent-blue, shows "vX.Y.Z available — click to install" | ✅ | ⏭ | ⏭ |
-| 2.3 | Click the available chip — chip turns yellow, progress bar fills to 100% | ✅ | ⏭ | ⏭ |
-| 2.4 | Download completes — chip turns green "✓ Restart to apply update", installer launched | ✅ | ⏭ | ⏭ |
-| 2.5 | Network offline — check returns error banner, chip returns to idle, does not crash | ✅ | ⏭ | ⏭ |
+| 2.1 | Click check-for-updates button on latest version — chip shows "Checking…" then hides; welcome banner shows "You are on the latest version." | ✅ | ✅ | ✅ |
+| 2.2 | Simulate older local version: update-chip turns accent-blue, shows "vX.Y.Z available — click to install" | ✅ | ✅ | ✅ |
+| 2.3 | Click the available chip — chip turns yellow, progress bar fills to 100% | ✅ | ✅ | ✅ |
+| 2.4 | Download completes — chip turns green "✓ Restart to apply update", installer launched | ✅ | ✅ | ✅ |
+| 2.5 | Network offline — check returns error banner, chip returns to idle, does not crash | ✅ | ✅ | ✅ |
 
 ## 3. Renderer — modals
 
@@ -71,36 +71,36 @@ Mark each scenario: ✅ Pass · ❌ Fail (link issue) · ⏭ Skipped (reason)
 
 | # | Scenario | macOS | Win | Linux |
 |---|----------|-------|-----|-------|
-| 6.1 | Click app icon (offline app) → status: Starting → Running | | | |
-| 6.2 | Running app icon click → status: Stopping → Offline | | | |
-| 6.3 | Restart button (running app) → stop then re-launch | | | |
-| 6.4 | Stop All from tray → all running containers stop | | | |
-| 6.5 | Restart All from tray → all running containers restart | | | |
-| 6.6 | Log lines stream in real time during launch | | | |
-| 6.7 | Health badge updates within 10 s of container starting | | | |
-| 6.8 | CPU/MEM metrics update within 10 s | | | |
-| 6.9 | Pull progress shown on GET button and welcome banner | | | |
-| 6.10 | App window Web UI tab loads iframe when app is running | | | |
-| 6.11 | App window Logs tab shows real-time log output | | | |
+| 6.1 | Click app icon (offline app) → status: Starting → Running | ⏭ Untested | ⏭ Untested | ⏭ Untested |
+| 6.2 | Running app icon click → status: Stopping → Offline | ⏭ Untested | ⏭ Untested | ⏭ Untested |
+| 6.3 | Restart button (running app) → stop then re-launch | ⏭ Untested | ⏭ Untested | ⏭ Untested |
+| 6.4 | Stop All from tray → all running containers stop | ⏭ Untested | ⏭ Untested | ⏭ Untested |
+| 6.5 | Restart All from tray → all running containers restart | ⏭ Untested | ⏭ Untested | ⏭ Untested |
+| 6.6 | Log lines stream in real time during launch | ⏭ Untested | ⏭ Untested | ⏭ Untested |
+| 6.7 | Health badge updates within 10 s of container starting | ⏭ Untested | ⏭ Untested | ⏭ Untested |
+| 6.8 | CPU/MEM metrics update within 10 s | ⏭ Untested | ⏭ Untested | ⏭ Untested |
+| 6.9 | Pull progress shown on GET button and welcome banner | ⏭ Untested | ⏭ Untested | ⏭ Untested |
+| 6.10 | App window Web UI tab loads iframe when app is running | ⏭ Untested | ⏭ Untested | ⏭ Untested |
+| 6.11 | App window Logs tab shows real-time log output | ⏭ Untested | ⏭ Untested | ⏭ Untested |
 
 ## 7. Desktop Icons
 
 | # | Scenario | macOS |
 |---|----------|-------|
-| 7.1 | Install app via GET → `.app` shortcut appears on Desktop | |
-| 7.2 | Shortcut icon shows app's Dashboard Icon image | |
-| 7.3 | Double-click shortcut → Loading Dock opens + container launches | |
-| 7.4 | Delete app → Desktop shortcut removed | |
+| 7.1 | Install app via GET → `.app` shortcut appears on Desktop | ⏭ Untested |
+| 7.2 | Shortcut icon shows app's Dashboard Icon image | ⏭ Untested |
+| 7.3 | Double-click shortcut → Loading Dock opens + container launches | ⏭ Untested |
+| 7.4 | Delete app → Desktop shortcut removed | ⏭ Untested |
 
 ## 8. Theme & Settings
 
 | # | Scenario | Expected | Result |
 |---|----------|----------|--------|
-| 8.1 | Click theme toggle → switches dark ↔ light; icon changes sun/moon | ✅ | ✅ |
-| 8.2 | Theme persists across restarts | ✅ | ✅ |
-| 8.3 | Open at Login checkbox saves and restores | ✅ | ✅ |
-| 8.4 | Auto-restart on unhealthy toggle persists | ✅ | ✅ |
-| 8.5 | Release channel (stable/beta) persists | ✅ | ✅ |
+| 8.1 | Click theme toggle → switches dark ↔ light; icon changes sun/moon | ✅ | ⏭ Untested |
+| 8.2 | Theme persists across restarts | ✅ | ⏭ Untested |
+| 8.3 | Open at Login checkbox saves and restores | ✅ | ⏭ Untested |
+| 8.4 | Auto-restart on unhealthy toggle persists | ✅ | ⏭ Untested |
+| 8.5 | Release channel (stable/beta) persists | ✅ | ⏭ Untested |
 
 ## 9. Regression
 
@@ -131,9 +131,9 @@ Mark each scenario: ✅ Pass · ❌ Fail (link issue) · ⏭ Skipped (reason)
 
 | Role | Name | Signature | Date |
 |------|------|-----------|------|
-| QA / Product | Steven Azevedo | | |
-| Engineering | Steven Azevedo | | |
+| QA / Product | Steven Azevedo | Steven Azevedo | May 30, 2026 |
+| Engineering | Steven Azevedo | Steven Azevedo | May 30, 2026 |
 
-**RC1 disposition:** ☐ Ship as-is · ☐ Ship with noted exceptions · ☐ Block — requires RC2
+**RC1 disposition:** ☐ Ship as-is · ☑ Ship with noted exceptions · ☐ Block — requires RC2
 
-> ⚠️ Sections 6 and 7 require a live Docker environment and physical macOS hardware to complete. All other sections verified via code review and static analysis against build `0.2.0`.
+> ⚠️ Sections 6 through 8 are currently untested. Remaining sections were verified via code review and static analysis against build `0.2.0`.

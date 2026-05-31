@@ -1,8 +1,8 @@
 const config = {
   app: {
     name: "The Loading Dock(r)",
-    identifier: "com.yourname.loadingdock",
-    version: "0.1.0",
+    identifier: "com.stevenazevedodesign.loadingdock",
+    version: "1.2.0",
     icon: "./App_Icon.png",
   },
   build: {

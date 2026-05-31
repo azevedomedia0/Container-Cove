@@ -46,17 +46,32 @@ export async function loadRegistry(
   try {
     const file = Bun.file(registryFile);
     const text = await file.text();
-    const raw = JSON.parse(text) as Omit<DockerApp, "status">[];
-    return raw.map((a) => ({
-      // Provide safe defaults for fields that may be absent in older registries
-      env: {},
-      volumes: [],
-      ports: [],
-      tags: [],
-      ...a,
-      status: "stopped",
-      containerId: undefined,
-    }));
+    const raw = JSON.parse(text) as Partial<DockerApp>[];
+    return raw.flatMap((a) => {
+      if (!a.id || !a.name || !a.icon || !a.description || !a.image) return [];
+      return [{
+        id: a.id,
+        name: a.name,
+        icon: a.icon,
+        description: a.description,
+        image: a.image,
+        ports: a.ports ?? [],
+        env: a.env ?? {},
+        volumes: a.volumes ?? [],
+        openUrl: a.openUrl,
+        composeProject: a.composeProject,
+        group: a.group,
+        restartPolicy: a.restartPolicy,
+        healthcheck: a.healthcheck,
+        health: a.health,
+        status: a.status === "running" ? "running" : "stopped",
+        containerId: undefined,
+        keychainEnvKeys: a.keychainEnvKeys,
+        sortOrder: a.sortOrder,
+        network: a.network,
+        localDomain: a.localDomain,
+      }];
+    });
   } catch {
     return getDefaultApps();
   }
@@ -74,7 +89,7 @@ export async function saveRegistry(
 ): Promise<void> {
   await ensureDir(dirname(registryFile));
   const serializable = apps.map(
-    ({ status: _s, containerId: _c, ...rest }) => rest,
+    ({ containerId: _c, ...rest }) => rest,
   );
   await Bun.write(registryFile, JSON.stringify(serializable, null, 2));
 }

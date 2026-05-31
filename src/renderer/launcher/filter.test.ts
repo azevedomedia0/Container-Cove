@@ -28,7 +28,7 @@ const running: DockerApp = {
   image: "redis:7",
   status: "running",
   group: "caches",
-  tags: ["fast", "memory"],
+
 };
 
 const errorApp: DockerApp = {
@@ -62,12 +62,6 @@ describe("filterApps", () => {
 
   test("filters by description", () => {
     const r = filterApps(all, "in-memory", "all", "all");
-    expect(r).toHaveLength(1);
-    expect(r[0].id).toBe("redis");
-  });
-
-  test("filters by tag", () => {
-    const r = filterApps(all, "fast", "all", "all");
     expect(r).toHaveLength(1);
     expect(r[0].id).toBe("redis");
   });

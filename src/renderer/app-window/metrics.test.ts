@@ -36,7 +36,7 @@ describe("maskValue", () => {
 
 describe("classifyLogLevel", () => {
   test("system lines", () => {
-    expect(classifyLogLevel("[electrodocker] started")).toBe("system");
+    expect(classifyLogLevel("[loading-dock] started")).toBe("system");
     expect(classifyLogLevel("[pull] layer 1")).toBe("system");
   });
 
@@ -48,7 +48,7 @@ describe("classifyLogLevel", () => {
 });
 
 describe("filterLogLines", () => {
-  const lines = ["[electrodocker] started", "ERROR: connection refused", "INFO: ready"];
+  const lines = ["[loading-dock] started", "ERROR: connection refused", "INFO: ready"];
 
   test("empty term returns all lines", () => {
     expect(filterLogLines(lines, "")).toEqual(lines);

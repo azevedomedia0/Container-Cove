@@ -18,7 +18,6 @@ export interface DockerApp {
   openUrl?: string;
   composeProject?: string;
   group?: string;
-  tags?: string[];
   restartPolicy?: "no" | "on-failure" | "unless-stopped";
   healthcheck?: {
     cmd?: string;
@@ -35,6 +34,10 @@ export interface DockerApp {
   network?: string;
   /** Local domain subdomain for the built-in reverse proxy, e.g. "jellyfin" → jellyfin.localhost:17300 (feature 10) */
   localDomain?: string;
+  /** Dashboard Icons slug — overrides image-derived slug when set */
+  iconSlug?: string;
+  /** Custom icon image URL — overrides iconSlug when set */
+  iconUrl?: string;
 }
 
 export interface AppMetricsPoint {
@@ -58,7 +61,17 @@ export type IpcMessage =
   | { type: "apps:list"; apps: DockerApp[] }
   | { type: "onboarding:state"; firstRun: boolean; showOnboarding: boolean; dataDir: string; systemUid: string; systemGid: string; systemTz: string }
   | { type: "onboarding:dismiss"; noStartup: boolean }
-  | { type: "docker:availability"; available: boolean }
+  | {
+      type: "docker:availability";
+      available: boolean;
+      message?: string;
+      detail?: string;
+      canRetry?: boolean;
+      canInstall?: boolean;
+    }
+  | { type: "docker:retry" }
+  | { type: "docker:start-if-needed" }
+  | { type: "podman:install" }
   | {
       type: "app:status";
       id: string;
@@ -103,6 +116,7 @@ export type IpcMessage =
       type: "update:available";
       version: string;
       releaseNotes: string;
+      downloadUrl: string;
       channel: "stable" | "beta";
     }
   | { type: "update:not-available" }
@@ -134,6 +148,15 @@ export type IpcMessage =
   | { type: "networks:list" }
   | { type: "networks:listed"; networks: string[] }
   | { type: "network:create"; name: string }
+  | {
+      type: "tray:bulk-action-request";
+      action: "stop-all" | "restart-all";
+    }
+  | {
+      type: "tray:bulk-action-confirm";
+      action: "stop-all" | "restart-all";
+    }
   | { type: "dialog:pick-folder"; callbackId: string }
   | { type: "dialog:folder-result"; callbackId: string; path: string }
-  | { type: "dialog:folder-cancelled"; callbackId: string };
+  | { type: "dialog:folder-cancelled"; callbackId: string }
+  | { type: "desktop:shortcut:progress"; state: "creating" | "done"; appName: string };

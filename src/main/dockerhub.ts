@@ -63,9 +63,8 @@ export async function fetchAllOgImages(
 }
 
 type DockerHubResult = {
-  name: string;
-  namespace: string;
-  description?: string;
+  repo_name: string;
+  short_description?: string;
   star_count?: number;
   pull_count?: number;
   is_official?: boolean;
@@ -76,13 +75,14 @@ type DockerHubResponse = {
 };
 
 function mapImage(row: DockerHubResult): DockerHubImage {
-  const namespace = row.namespace || "library";
-  const name = row.name || "";
+  const parts = (row.repo_name ?? "").split("/");
+  const name = parts.length >= 2 ? parts[1] : parts[0];
+  const namespace = parts.length >= 2 ? parts[0] : "library";
   return {
     name,
     namespace,
     fullName: `${namespace}/${name}`,
-    description: row.description ?? "",
+    description: row.short_description ?? "",
     starCount: row.star_count ?? 0,
     pullCount: row.pull_count ?? 0,
     isOfficial: Boolean(row.is_official || namespace === "library"),
@@ -98,7 +98,7 @@ async function fetchHub(url: string): Promise<DockerHubImage[]> {
 }
 
 export async function getPopularImages(limit = 50): Promise<DockerHubImage[]> {
-  const url = `https://hub.docker.com/v2/search/repositories/?page=1&page_size=${limit}&ordering=-pull_count&is_official=true`;
+  const url = `https://hub.docker.com/v2/search/repositories/?page=1&page_size=${limit}&query=*&ordering=-pull_count&is_official=true`;
   return fetchHub(url);
 }
 

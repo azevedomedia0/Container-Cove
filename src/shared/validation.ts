@@ -28,8 +28,6 @@ export function isValidPortMapping(mapping: string): boolean {
   const hostPort = Number(host);
   const containerPort = Number(container);
   return (
-    Number.isInteger(hostPort) &&
-    Number.isInteger(containerPort) &&
     hostPort >= 1 &&
     hostPort <= 65535 &&
     containerPort >= 1 &&
@@ -45,4 +43,13 @@ export function validateOpenUrl(input: string): string | undefined {
     throw new Error("Open URL must use http or https.");
   }
   return parsed.toString();
+}
+
+export function validateLocalDomain(input: string): string | undefined {
+  const trimmed = input.trim().toLowerCase();
+  if (!trimmed) return undefined;
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(trimmed)) {
+    throw new Error("Local domain must be a single DNS label using letters, numbers, or hyphens.");
+  }
+  return trimmed;
 }

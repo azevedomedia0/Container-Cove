@@ -47,38 +47,55 @@
 
 
       <div id="docker-warning" class="banner banner--warn hidden">
-        <span id="docker-warning-text">Starting Docker — please wait…</span>
+        <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+          <span id="docker-warning-text">Starting Podman — please wait…</span>
+          <small id="docker-warning-detail" class="hidden" style="font-size:11px;opacity:0.85;line-height:1.4;"></small>
+        </div>
+        <div class="banner__actions">
+          <button id="btn-docker-install" type="button" class="banner__action btn btn--ghost btn--sm hidden">Open install guide</button>
+          <button id="btn-docker-retry" type="button" class="banner__action btn btn--ghost btn--sm hidden">Retry</button>
+        </div>
       </div>
       <div id="error-banner" class="banner banner--error hidden"></div>
       <div id="welcome-banner" class="banner hidden"></div>
+      <div id="restart-toast" class="banner hidden">
+        <span id="restart-toast-msg"></span>
+        <button id="restart-toast-undo" type="button" class="btn btn--ghost btn--sm">Undo</button>
+      </div>
+      <div id="desktop-shortcut-popup" class="banner banner--info hidden">
+        <span>Creating Desktop App | Please Wait…</span>
+      </div>
 
       <!-- Onboarding modal -->
       <div id="onboarding-panel" class="modal hidden">
-        <div class="modal-box modal-box--onboarding">
+        <div class="modal-box modal-box--onboarding" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
           <div class="onboarding-hero">
             <img src="../../../App_Icon.png" class="onboarding-logo" alt="" aria-hidden="true" />
             <div>
-              <h2 class="onboarding-title">Welcome to The Loading Dock(r)</h2>
-              <p class="onboarding-sub">Run Docker containers as desktop apps — no terminal needed.</p>
+              <h2 id="onboarding-title" class="onboarding-title">Welcome to The Loading Dock(r)</h2>
+              <p class="onboarding-sub">Run containers as desktop apps with Podman — no terminal needed.</p>
             </div>
           </div>
-          <div class="onboarding-datadir">
-            <div class="onboarding-datadir__label">
-              <strong>App data location</strong>
-              <small>Where container configs, databases, and other app data will be stored on your Mac.</small>
+          <div id="onboarding-podman-install" class="onboarding-install hidden">
+            <div class="onboarding-install__copy">
+              <strong>Install Podman first</strong>
+              <small>The Loading Dock(r) uses Podman to run your apps. Open the install guide, install Podman, then come back and click Retry.</small>
             </div>
-            <div class="onboarding-datadir__picker">
-              <span id="onboarding-datadir-path" class="onboarding-datadir__path">~/.loading-dock</span>
-              <button id="btn-onboarding-pick-dir" class="btn btn--ghost btn--sm">Browse…</button>
+            <div class="onboarding-install__actions">
+              <button id="btn-onboarding-install-podman" type="button" class="btn btn--primary btn--sm">Open install guide</button>
             </div>
           </div>
-
+          <div class="onboarding-intro">
+            <span class="onboarding-intro__emoji">🐳</span>
+            <p class="onboarding-intro__line">Your containers, docked and ready</p>
+            <p class="onboarding-intro__sub">No terminals. No fuss. Just apps.</p>
+          </div>
           <div class="onboarding-steps">
             <div class="onboarding-step">
               <div class="onboarding-step__num">1</div>
               <div class="onboarding-step__body">
                 <strong>Add an app</strong>
-                <span>Click the <b>↑</b> button in the toolbar or browse Docker Hub to add a container. Give it a name, image, ports, and an optional Web UI URL.</span>
+                <span>Click the <b>↑</b> button in the toolbar or browse Docker Hub to add a container. Volume mounts keep your data safe across restarts.</span>
               </div>
             </div>
             <div class="onboarding-step">
@@ -108,7 +125,22 @@
               <input type="checkbox" id="onboarding-no-startup" />
               Don't show on startup
             </label>
-            <button id="btn-onboarding-dismiss" class="btn btn--primary">Get Started</button>
+            <div class="onboarding-footer__actions">
+              <button id="btn-onboarding-skip" type="button" class="btn btn--ghost">Skip</button>
+              <button id="btn-onboarding-dismiss" type="button" class="btn btn--primary">Get Started</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tray bulk-action confirmation -->
+      <div id="tray-confirm-modal" class="modal hidden">
+        <div class="modal-box modal-box--confirm" role="dialog" aria-modal="true" aria-labelledby="tray-confirm-title">
+          <h2 id="tray-confirm-title" class="tray-confirm__title">Confirm action</h2>
+          <p id="tray-confirm-body" class="tray-confirm__body"></p>
+          <div class="modal-actions tray-confirm__actions">
+            <button id="tray-confirm-cancel" type="button" class="btn btn--ghost">Cancel</button>
+            <button id="tray-confirm-accept" type="button" class="btn btn--danger">Confirm</button>
           </div>
         </div>
       </div>
@@ -148,7 +180,7 @@
           <summary>Installed</summary>
           <div id="grid" class="app-grid"></div>
         </details>
-<details id="section-recommended" class="section-dropdown" open>
+        <details id="section-recommended" class="section-dropdown">
           <summary>Recommended Apps</summary>
           <div class="store-panel">
             <div id="store-grid" class="rec-grid"></div>
@@ -160,18 +192,23 @@
       <div id="modal-add" class="modal hidden">
         <div class="modal-box">
           <div class="modal-tabs">
-            <button class="modal-tab modal-tab--active" data-tab="app" aria-label="Switch to Docker App tab">Docker App</button>
-            <button class="modal-tab" data-tab="compose" aria-label="Switch to Docker Compose tab">Docker Compose</button>
+            <button class="modal-tab modal-tab--active" data-tab="app" aria-label="Switch to App tab">App</button>
+            <button class="modal-tab" data-tab="compose" aria-label="Switch to Compose tab">Compose</button>
           </div>
 
-          <!-- Tab: Docker App -->
+          <!-- Tab: App -->
           <div id="add-tab-app" class="tab-panel">
             <label>Name <input id="add-name" type="text" placeholder="My App" /></label>
-            <label>Docker Image <input id="add-image" type="text" placeholder="nginx:latest" /></label>
+            <label>Image <input id="add-image" type="text" placeholder="nginx:latest" /></label>
             <label>Ports <input id="add-ports" type="text" placeholder="8080:80" /></label>
             <label>Open URL (optional) <input id="add-url" type="text" placeholder="http://localhost:8080" /></label>
             <label>Group <input id="add-group" type="text" placeholder="databases" /></label>
-            <label>Tags (comma separated) <input id="add-tags" type="text" placeholder="db, local, backend" /></label>
+            <label>Docker Network
+              <div class="network-row">
+                <select id="add-network"><option value="">Default</option></select>
+                <button type="button" class="btn btn--ghost btn--xs" id="add-network-create" title="Create new network">+ New</button>
+              </div>
+            </label>
             <label>Restart Policy
               <select id="add-restart">
                 <option value="no">No</option>
@@ -179,25 +216,9 @@
                 <option value="unless-stopped">Unless stopped</option>
               </select>
             </label>
-            <label>Healthcheck Command
-              <input id="add-health-cmd" type="text" placeholder="curl -f http://localhost || exit 1" />
+            <label>Local Domain <small class="label-hint">.localhost:17300</small>
+              <input id="add-local-domain" type="text" placeholder="myapp" />
             </label>
-            <div class="split3">
-              <label>Interval (s) <input id="add-health-interval" type="number" min="1" placeholder="30" /></label>
-              <label>Timeout (s) <input id="add-health-timeout" type="number" min="1" placeholder="5" /></label>
-              <label>Retries <input id="add-health-retries" type="number" min="1" placeholder="3" /></label>
-            </div>
-            <div class="split2">
-              <label>Docker Network
-                <div class="network-row">
-                  <select id="add-network"><option value="">Default</option></select>
-                  <button type="button" class="btn btn--ghost btn--xs" id="add-network-create" title="Create new network">+ New</button>
-                </div>
-              </label>
-              <label>Local Domain <small class="label-hint">.localhost:17300</small>
-                <input id="add-local-domain" type="text" placeholder="myapp" />
-              </label>
-            </div>
             <div class="field-section">
               <div class="field-section__header">
                 <span>Environment Variables</span>
@@ -232,13 +253,13 @@
       <!-- Edit modal -->
       <div id="modal-edit" class="modal hidden">
         <div class="modal-box modal-box--edit">
-          <h2 class="edit-modal__title">Edit Docker App</h2>
+          <h2 class="edit-modal__title">Edit App</h2>
 
           <div class="edit-modal__body">
             <!-- Row 1: Name + Image -->
             <div class="edit-fields-grid">
               <label>Name <input id="edit-name" type="text" /></label>
-              <label>Docker Image <input id="edit-image" type="text" /></label>
+              <label>Image <input id="edit-image" type="text" /></label>
             </div>
 
             <!-- Row 2: Ports + Open URL -->
@@ -247,13 +268,18 @@
               <label>Open URL <input id="edit-url" type="text" placeholder="http://localhost:8080" /></label>
             </div>
 
-            <!-- Row 3: Group + Tags -->
+            <!-- Row 3: Group + Docker Network -->
             <div class="edit-fields-grid">
               <label>Group <input id="edit-group" type="text" placeholder="databases" /></label>
-              <label>Tags <input id="edit-tags" type="text" placeholder="db, local, backend" /></label>
+              <label>Docker Network
+                <div class="network-row">
+                  <select id="edit-network"><option value="">Default</option></select>
+                  <button type="button" class="btn btn--ghost btn--xs" id="edit-network-create" title="Create new network">+ New</button>
+                </div>
+              </label>
             </div>
 
-            <!-- Row 4: Restart + Healthcheck -->
+            <!-- Row 4: Restart + Local Domain -->
             <div class="edit-fields-grid">
               <label>Restart Policy
                 <select id="edit-restart">
@@ -261,24 +287,6 @@
                   <option value="on-failure">On failure</option>
                   <option value="unless-stopped">Unless stopped</option>
                 </select>
-              </label>
-              <label>Healthcheck Command <input id="edit-health-cmd" type="text" placeholder="curl -f http://localhost || exit 1" /></label>
-            </div>
-
-            <!-- Row 5: Healthcheck timing (3-col) -->
-            <div class="split3">
-              <label>Interval (s) <input id="edit-health-interval" type="number" min="1" /></label>
-              <label>Timeout (s) <input id="edit-health-timeout" type="number" min="1" /></label>
-              <label>Retries <input id="edit-health-retries" type="number" min="1" /></label>
-            </div>
-
-            <!-- Row: Network + Local Domain -->
-            <div class="edit-fields-grid">
-              <label>Docker Network
-                <div class="network-row">
-                  <select id="edit-network"><option value="">Default</option></select>
-                  <button type="button" class="btn btn--ghost btn--xs" id="edit-network-create" title="Create new network">+ New</button>
-                </div>
               </label>
               <label>Local Domain <small class="label-hint">.localhost:17300</small>
                 <input id="edit-local-domain" type="text" placeholder="myapp" />
@@ -305,16 +313,12 @@
           </div>
 
           <div class="modal-actions edit-modal__actions">
-            <div class="edit-delete-group">
-              <button id="btn-edit-delete" class="btn btn--danger" aria-label="Delete this app">Delete</button>
-              <label class="cleanup-opt" title="Also delete Docker volumes when removing"><input type="checkbox" id="edit-clean-volumes" /> Volumes</label>
-              <label class="cleanup-opt" title="Also remove the Docker image when removing"><input type="checkbox" id="edit-clean-image" /> Image</label>
-            </div>
-            <button id="btn-edit-stop" class="btn btn--stop hidden" aria-label="Stop this app">Stop</button>
+            <button id="btn-edit-delete" class="btn btn--sm btn--danger" aria-label="Delete this app">Delete</button>
+            <button id="btn-edit-stop" class="btn btn--sm btn--stop hidden" aria-label="Stop this app">Stop</button>
             <div class="edit-modal__actions-spacer"></div>
-            <button id="btn-edit-duplicate" class="btn btn--ghost" aria-label="Duplicate this app">Duplicate</button>
-            <button id="btn-edit-cancel" class="btn btn--ghost" aria-label="Cancel editing app">Cancel</button>
-            <button id="btn-edit-confirm" class="btn btn--primary" aria-label="Save app changes">Save</button>
+            <button id="btn-edit-duplicate" class="btn btn--sm btn--ghost" aria-label="Duplicate this app">Duplicate</button>
+            <button id="btn-edit-cancel" class="btn btn--sm btn--ghost" aria-label="Cancel editing app">Cancel</button>
+            <button id="btn-edit-confirm" class="btn btn--sm btn--primary" aria-label="Save app changes">Save</button>
           </div>
         </div>
       </div>
@@ -340,116 +344,105 @@
         <div class="modal-box modal-box--settings">
 
           <div class="settings-header">
-            <svg class="settings-header__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             <h2 class="settings-header__title">Settings</h2>
+            <button id="btn-settings-close" class="settings-header__close" aria-label="Close settings">×</button>
           </div>
 
           <div class="settings-modal__body">
+            <div class="settings-list">
 
-            <div class="settings-col">
-              <section class="settings-section">
-                <div class="settings-section__header">
-                  <span class="settings-section__icon">⚡</span>
-                  <h3 class="settings-section__title">Startup</h3>
-                </div>
-                <div class="settings-group">
-                  <label class="settings-row">
-                    <div class="settings-row__text">
-                      <span class="settings-row__label">Open at Login</span>
-                      <span class="settings-row__desc">Launch automatically when you log in</span>
-                    </div>
-                    <input type="checkbox" id="toggle-open-at-login" class="settings-toggle" />
-                  </label>
-                  <label class="settings-row">
-                    <div class="settings-row__text">
-                      <span class="settings-row__label">Show welcome guide</span>
-                      <span class="settings-row__desc">Display the onboarding guide on startup</span>
-                    </div>
-                    <input type="checkbox" id="toggle-show-onboarding" class="settings-toggle" />
-                  </label>
-                </div>
-              </section>
-
-              <section class="settings-section">
-                <div class="settings-section__header">
-                  <span class="settings-section__icon">🐳</span>
-                  <h3 class="settings-section__title">Containers</h3>
-                </div>
-                <div class="settings-group">
-                  <label class="settings-row">
-                    <div class="settings-row__text">
-                      <span class="settings-row__label">Auto-restart unhealthy</span>
-                      <span class="settings-row__desc">Restart after repeated failed health checks</span>
-                    </div>
-                    <input type="checkbox" id="toggle-auto-restart" class="settings-toggle" />
-                  </label>
-                </div>
-              </section>
-            </div>
-
-            <div class="settings-col">
-              <section class="settings-section">
-                <div class="settings-section__header">
-                  <span class="settings-section__icon">🔄</span>
-                  <h3 class="settings-section__title">Updates</h3>
-                </div>
-                <div class="settings-group">
-                  <label class="settings-row">
-                    <div class="settings-row__text">
-                      <span class="settings-row__label">Check automatically</span>
-                      <span class="settings-row__desc">Check for updates on launch</span>
-                    </div>
-                    <input type="checkbox" id="toggle-auto-check-updates" class="settings-toggle" />
-                  </label>
-                  <div class="settings-row">
-                    <div class="settings-row__text">
-                      <span class="settings-row__label">Release channel</span>
-                      <span class="settings-row__desc">Stable or early beta builds</span>
-                    </div>
-                    <select id="release-channel" class="settings-select">
-                      <option value="stable">Stable</option>
-                      <option value="beta">Beta</option>
-                    </select>
+              <div class="settings-group">
+                <div class="settings-group__label">Storage</div>
+                <div class="settings-item">
+                  <div class="settings-item__text">
+                    <span class="settings-item__label">App data location</span>
+                    <span class="settings-item__desc">Where container configs and app data are stored</span>
+                  </div>
+                  <div class="settings-dir-picker">
+                    <span id="settings-datadir-path" class="settings-dir-picker__path">~/.loading-dock</span>
+                    <button id="btn-settings-pick-dir" class="btn btn--ghost btn--sm">Browse…</button>
                   </div>
                 </div>
-              </section>
+              </div>
 
-              <section class="settings-section">
-                <div class="settings-section__header">
-                  <span class="settings-section__icon">🔒</span>
-                  <h3 class="settings-section__title">Privacy &amp; Security</h3>
+              <div class="settings-group">
+                <div class="settings-group__label">Startup</div>
+                <label class="settings-item">
+                  <div class="settings-item__text">
+                    <span class="settings-item__label">Open at Login</span>
+                    <span class="settings-item__desc">Launch automatically when you log in</span>
+                  </div>
+                  <input type="checkbox" id="toggle-open-at-login" class="settings-toggle" />
+                </label>
+                <label class="settings-item">
+                  <div class="settings-item__text">
+                    <span class="settings-item__label">Show welcome guide</span>
+                    <span class="settings-item__desc">Display the onboarding guide on startup</span>
+                  </div>
+                  <input type="checkbox" id="toggle-show-onboarding" class="settings-toggle" />
+                </label>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group__label">Containers</div>
+                <label class="settings-item">
+                  <div class="settings-item__text">
+                    <span class="settings-item__label">Auto-restart unhealthy</span>
+                    <span class="settings-item__desc">Restart after repeated failed health checks</span>
+                  </div>
+                  <input type="checkbox" id="toggle-auto-restart" class="settings-toggle" />
+                </label>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group__label">Updates</div>
+                <label class="settings-item">
+                  <div class="settings-item__text">
+                    <span class="settings-item__label">Check automatically</span>
+                    <span class="settings-item__desc">Check for updates on launch</span>
+                  </div>
+                  <input type="checkbox" id="toggle-auto-check-updates" class="settings-toggle" />
+                </label>
+                <div class="settings-item">
+                  <div class="settings-item__text">
+                    <span class="settings-item__label">Release channel</span>
+                    <span class="settings-item__desc">Stable or early beta builds</span>
+                  </div>
+                  <select id="release-channel" class="settings-select">
+                    <option value="stable">Stable</option>
+                    <option value="beta">Beta</option>
+                  </select>
                 </div>
-                <div class="settings-group">
-                  <label class="settings-row">
-                    <div class="settings-row__text">
-                      <span class="settings-row__label">Mask secrets in logs</span>
-                      <span class="settings-row__desc">Redact sensitive env var values</span>
-                    </div>
-                    <input type="checkbox" id="toggle-mask-secrets" class="settings-toggle" />
-                  </label>
-                  <label class="settings-row">
-                    <div class="settings-row__text">
-                      <span class="settings-row__label">macOS Keychain</span>
-                      <span class="settings-row__desc">Store secrets in system Keychain</span>
-                    </div>
-                    <input type="checkbox" id="toggle-keychain-secrets" class="settings-toggle" />
-                  </label>
-                  <label class="settings-row">
-                    <div class="settings-row__text">
-                      <span class="settings-row__label">Error logging</span>
-                      <span class="settings-row__desc">Record errors to a local log file</span>
-                    </div>
-                    <input type="checkbox" id="toggle-error-logging" class="settings-toggle" />
-                  </label>
-                </div>
-              </section>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group__label">Privacy &amp; Security</div>
+                <label class="settings-item">
+                  <div class="settings-item__text">
+                    <span class="settings-item__label">Mask secrets in logs</span>
+                    <span class="settings-item__desc">Redact sensitive env var values</span>
+                  </div>
+                  <input type="checkbox" id="toggle-mask-secrets" class="settings-toggle" />
+                </label>
+                <label class="settings-item">
+                  <div class="settings-item__text">
+                    <span class="settings-item__label">macOS Keychain</span>
+                    <span class="settings-item__desc">Store secrets in system Keychain</span>
+                  </div>
+                  <input type="checkbox" id="toggle-keychain-secrets" class="settings-toggle" />
+                </label>
+                <label class="settings-item">
+                  <div class="settings-item__text">
+                    <span class="settings-item__label">Error logging</span>
+                    <span class="settings-item__desc">Record errors to a local log file</span>
+                  </div>
+                  <input type="checkbox" id="toggle-error-logging" class="settings-toggle" />
+                </label>
+              </div>
+
             </div>
-
           </div>
 
-          <div class="settings-footer">
-            <button id="btn-settings-close" class="btn btn--primary btn--sm">Done</button>
-          </div>
         </div>
       </div>
 

@@ -6,27 +6,54 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Cancel any in-flight run for the same ref so fast-push branches don't pile up.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  BUN_VERSION: "1.x"
+
 jobs:
-  # ── Lint + type-check (Linux only, fast gate) ─────────────────
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 1 — Lint, format, and type-check (Ubuntu only; fast gate)
+  # Runs on Linux to avoid spending macOS/Windows runner minutes on
+  # static analysis that has no platform-specific behaviour.
+  # ─────────────────────────────────────────────────────────────────
   lint:
-    name: Lint & typecheck
+    name: Lint & format & typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
-      - run: bun install --frozen-lockfile
-      - run: bun run lint
-      - run: bun run typecheck
+          bun-version: ${{ env.BUN_VERSION }}
 
-  # ── Unit + renderer tests (all platforms) ─────────────────────
+      - name: Cache Bun package store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - run: bun install --frozen-lockfile
+
+      - name: Prettier — format check
+        run: bun run format:check
+
+      - name: ESLint
+        run: bun run lint
+
+      - name: TypeScript — type check
+        run: bun run typecheck
+
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 2 — Unit tests (all three platforms in parallel)
+  # Excludes src/e2e/** so these stay fast and Docker-free.
+  # ─────────────────────────────────────────────────────────────────
   unit:
-    name: Unit tests (${{ matrix.os }})
+    name: Unit (${{ matrix.os }})
     needs: lint
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -35,77 +62,98 @@ jobs:
         include:
           - os: macOS
             runner: macos-latest
-          - os: Windows
-            runner: windows-latest
           - os: Linux
             runner: ubuntu-latest
+          - os: Windows
+            runner: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun package store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
       - run: bun install --frozen-lockfile
+
       - name: Run unit tests
         run: bun test --timeout 30000 --ignore "src/e2e/**"
 
-  # ── E2E smoke tests (Linux) ───────────────────────────────────
-  e2e-linux:
-    name: E2E smoke tests (Linux)
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 3 — E2E smoke tests (Docker required)
+  #
+  # Linux:   Docker daemon is pre-installed and already running.
+  # macOS:   Docker CLI + Colima (lightweight VM) installed via Homebrew.
+  # Windows: Linux containers are unavailable on GitHub-hosted Windows
+  #          runners without WSL2 reconfiguration.  The smoke tests
+  #          detect this via isDockerAvailable() and skip gracefully,
+  #          which still validates the skip-detection path.
+  # ─────────────────────────────────────────────────────────────────
+  e2e:
+    name: E2E (${{ matrix.os }})
     needs: unit
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Linux
+            runner: ubuntu-latest
+            docker_setup: native
+          - os: macOS
+            runner: macos-latest
+            docker_setup: colima
+          - os: Windows
+            runner: windows-latest
+            docker_setup: none
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - run: bun install --frozen-lockfile
-      - name: Verify Docker available
-        run: docker info
-      - name: Pull test image
-        run: docker pull alpine:3.19
-      - name: Run E2E smoke tests
-        run: bun test src/e2e/smoke.test.ts --timeout 60000
-        env:
-          DOCKER_PATH: docker
 
-  # ── E2E smoke tests (macOS via colima) ───────────────────────
-  e2e-macos:
-    name: E2E smoke tests (macOS)
-    needs: unit
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun package store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
       - run: bun install --frozen-lockfile
-      - name: Start Docker via colima
+
+      - name: Install Docker via Colima (macOS)
+        if: matrix.docker_setup == 'colima'
         run: |
           brew install colima docker
           colima start --cpu 2 --memory 4
-      - name: Pull test image
+          for i in $(seq 1 30); do docker info &>/dev/null && break || sleep 2; done
+          docker pull alpine:3.19
+
+      - name: Pull test image (Linux)
+        if: matrix.docker_setup == 'native'
         run: docker pull alpine:3.19
-      - name: Run E2E smoke tests
+
+      - name: E2E smoke tests
         run: bun test src/e2e/smoke.test.ts --timeout 90000
+        timeout-minutes: 12
 
-  # ── Windows: Docker unavailable, verify graceful skip ─────────
-  e2e-windows-skip:
-    name: E2E smoke tests (Windows – skip check)
-    needs: unit
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - run: bun install --frozen-lockfile
-      - name: Run E2E (expect graceful skip)
-        run: bun test src/e2e/smoke.test.ts --timeout 30000
-
-  # ── Build verification ────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 4 — Platform builds + artifact upload
+  # Only runs on push events (not PRs) to avoid burning runner
+  # minutes on every review iteration.
+  # Gated on e2e so we never upload an artifact from a broken commit.
+  # ─────────────────────────────────────────────────────────────────
   build:
     name: Build (${{ matrix.os }})
-    needs: unit
+    needs: e2e
+    if: github.event_name == 'push'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -113,27 +161,38 @@ jobs:
         include:
           - os: macOS
             runner: macos-latest
-            build_cmd: build:mac
-          - os: Windows
-            runner: windows-latest
-            build_cmd: build:win
+            cmd: build:mac
           - os: Linux
             runner: ubuntu-latest
-            build_cmd: build:linux
+            cmd: build:linux
+          - os: Windows
+            runner: windows-latest
+            cmd: build:win
     steps:
       - uses: actions/checkout@v4
+
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun package store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
       - run: bun install --frozen-lockfile
-      - name: Build ${{ matrix.os }} artifact
-        run: bun run ${{ matrix.build_cmd }}
-      - name: Upload artifact
+
+      - name: Build (${{ matrix.os }})
+        run: bun run ${{ matrix.cmd }}
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: electrodocker-${{ matrix.os }}
+          name: loading-dock-${{ matrix.os }}-${{ github.sha }}
           path: |
             build/
             dist/
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 7

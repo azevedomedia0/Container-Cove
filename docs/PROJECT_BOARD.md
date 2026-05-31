@@ -51,10 +51,32 @@
 - [x] Tailscale moved to Self-hosted Essentials
 - [x] Linked to GitHub — https://github.com/azevedomedia0/LoadingDock_R
 
+## v1.3 — Polish & Update Flow (shipped)
+
+- [x] MIT license added to repository
+- [x] Dark/light theme toggle
+- [x] One-click update flow with progress in topbar
+
+## v1.4 — UI Hardening & Consistency (shipped)
+
+- [x] Harden Windows notification — Base64-encode PowerShell args to prevent injection via app names
+- [x] Polish Podman install guidance — platform-aware hints for first-run vs. unavailable-runtime states
+- [x] Redesign general settings — dark/light theme-aware, iOS-style toggles, cleaner layout
+- [x] Update Tailscale and Nextcloud recommended-app icons to official URLs
+- [x] Desktop shortcut creation progress popup — "Creating Desktop App | Please Wait…" while icon artwork is fetched
+- [x] Installed Apps panel min-height — shows space for one card even when empty
+- [x] Installed/desktop icons now match recommended app counterparts via `iconSlug` + `iconUrl`
+- [x] App restart confirmation / undo toast — 3-second grace period with Undo button
+- [x] App card density audit — tighter padding, smaller icons, fixed rec-card hover reflow
+- [x] Onboarding modal density audit — tighter padding, smaller logo, cleaner step cards
+- [x] Recommended apps panel max-height capped so it doesn't compress installed apps
+
 ## Up Next
 
-- [ ] MIT licence added to repository
-- [ ] App restart confirmation / undo toast
-- [ ] Dark/light theme toggle
-- [ ] One-click update flow with progress in topbar
-- [ ] Search recommended apps by name/category
+## Next Steps
+
+- [ ] Review launcher layouts on narrow screens after the recent section sizing changes
+- [ ] Validate Windows notification Base64 flow on a real Windows build
+- [x] Test desktop shortcut icon fetch + `.icns` generation end-to-end on a clean macOS install
+- [ ] Consider onboarding video or animated GIF for first-run Podman setup
+- [ ] Fix General Settings UI Design

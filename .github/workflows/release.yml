@@ -1,56 +1,214 @@
 name: Release
 
+# Triggered by any tag that looks like a version: v1.2.3 or v1.2.3-beta.1
 on:
   push:
-    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+-*"]
 
+# Write access is required to create/edit GitHub Releases.
 permissions:
   contents: write
 
+# Never cancel a release in flight — that could leave a partial release.
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  BUN_VERSION: "1.x"
+
 jobs:
-  build-and-release:
-    name: Build & publish (${{ matrix.os }})
+  # ─────────────────────────────────────────────────────────────────
+  # 1. Validate — ensure tag == package.json version before anything runs.
+  # ─────────────────────────────────────────────────────────────────
+  validate:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+      prerelease: ${{ steps.parse.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches package.json version
+        id: parse
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"   # strip leading 'v'
+
+          PKG_VER=$(node -p "require('./package.json').version")
+          if [[ "$PKG_VER" != "$VERSION" ]]; then
+            echo "::error::Tag ${TAG} implies version ${VERSION} but package.json has ${PKG_VER}."
+            echo "::error::Update package.json before tagging, or use scripts/release.sh to tag."
+            exit 1
+          fi
+
+          # A dash in the version (e.g. 1.0.0-beta.1) marks a pre-release.
+          if [[ "$VERSION" == *"-"* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Tag ${TAG} == package.json ${PKG_VER} ✓"
+
+  # ─────────────────────────────────────────────────────────────────
+  # 2. Test gate — full suite on Linux (fastest runner with Docker).
+  #    Lint + typecheck + unit + E2E must all pass before we build.
+  # ─────────────────────────────────────────────────────────────────
+  test:
+    name: Release test gate
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun package store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run format:check
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun test --timeout 30000 --ignore "src/e2e/**"
+
+      - name: Pull Docker test image
+        run: docker pull alpine:3.19
+
+      - name: E2E smoke tests
+        run: bun test src/e2e/smoke.test.ts --timeout 60000
+        timeout-minutes: 10
+
+  # ─────────────────────────────────────────────────────────────────
+  # 3. Create draft release — extract changelog section and open a
+  #    draft so artifact jobs can upload into it concurrently.
+  # ─────────────────────────────────────────────────────────────────
+  create-release:
+    name: Create draft release
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.validate.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          # Extract the block between ## [VERSION] and the next ## [
+          awk "/^## \[${VERSION}\]/{f=1;next} f && /^## \[/{exit} f" CHANGELOG.md \
+            > release-notes.md
+          if [[ ! -s release-notes.md ]]; then
+            echo "No CHANGELOG entry found for v${VERSION}; using generic notes." >&2
+            printf "See [CHANGELOG.md](CHANGELOG.md) for details.\n" > release-notes.md
+          fi
+          echo "--- release-notes.md ---"
+          cat release-notes.md
+
+      - name: Create draft GitHub Release
+        run: |
+          PRERELEASE_FLAG=""
+          if [[ "${{ needs.validate.outputs.prerelease }}" == "true" ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            --draft \
+            --title "The Loading Dock(r) v${VERSION}" \
+            --notes-file release-notes.md \
+            $PRERELEASE_FLAG
+
+  # ─────────────────────────────────────────────────────────────────
+  # 4. Build + upload — three platform builds run in parallel.
+  #    Each uploads its dist/ files into the draft release.
+  # ─────────────────────────────────────────────────────────────────
+  release-artifacts:
+    name: Release artifacts (${{ matrix.os }})
+    needs: [validate, create-release]
     runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: ${{ needs.validate.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macOS
             runner: macos-latest
-            build_cmd: build:mac
-            artifact_glob: "dist/*.zip dist/*.dmg"
-            suffix: mac-arm64.zip
-          - os: Windows
-            runner: windows-latest
-            build_cmd: build:win
-            artifact_glob: "dist/*.exe"
-            suffix: win-x64.exe
+            cmd: build:mac
           - os: Linux
             runner: ubuntu-latest
-            build_cmd: build:linux
-            artifact_glob: "dist/*.AppImage"
-            suffix: linux-x64.AppImage
+            cmd: build:linux
+          - os: Windows
+            runner: windows-latest
+            cmd: build:win
     steps:
       - uses: actions/checkout@v4
+
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun package store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
       - run: bun install --frozen-lockfile
-      - name: Run tests
-        run: bun test --timeout 30000 --ignore "src/e2e/**"
-      - name: Build ${{ matrix.os }}
-        run: bun run ${{ matrix.build_cmd }}
-      - name: Generate checksums
+
+      - name: Build (${{ matrix.os }})
+        run: bun run ${{ matrix.cmd }}
+
+      - name: Generate per-platform checksums
         shell: bash
         run: |
           mkdir -p dist
-          for f in dist/*; do
-            sha256sum "$f" >> dist/checksums.txt 2>/dev/null || shasum -a 256 "$f" >> dist/checksums.txt
-          done
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*
-          body_path: RELEASE_NOTES.md
-          fail_on_unmatched_files: false
+          cd dist
+          # shasum is available on macOS; sha256sum on Linux/Windows Git Bash.
+          for f in *; do
+            [[ -f "$f" ]] || continue
+            (sha256sum "$f" 2>/dev/null || shasum -a 256 "$f")
+          done > "checksums-${{ matrix.os }}.txt" || true
+          if [[ -s "checksums-${{ matrix.os }}.txt" ]]; then
+            echo "Checksums:"
+            cat "checksums-${{ matrix.os }}.txt"
+          else
+            echo "(no files in dist/ to checksum)"
+          fi
+
+      - name: Upload artifacts to GitHub Release
+        shell: bash
+        run: |
+          FILES=$(find dist -maxdepth 1 -type f | tr '\n' ' ')
+          if [[ -n "$FILES" ]]; then
+            gh release upload "$GITHUB_REF_NAME" $FILES --clobber
+          else
+            echo "Warning: no files found in dist/ — nothing uploaded for ${{ matrix.os }}"
+          fi
+
+  # ─────────────────────────────────────────────────────────────────
+  # 5. Publish — flip the draft to published once all three platforms
+  #    have uploaded successfully.
+  # ─────────────────────────────────────────────────────────────────
+  publish-release:
+    name: Publish release
+    needs: release-artifacts
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Mark release as published
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false --repo "$GITHUB_REPOSITORY"

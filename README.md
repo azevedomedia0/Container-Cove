@@ -9,7 +9,7 @@ Run Docker containers as desktop apps — no terminal needed. Built with [Electr
 ## Prerequisites
 
 - [Bun](https://bun.sh) >= 1.0
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine on Linux)
+- [Podman](https://podman.io/docs/installation) (recommended; The Loading Dock(r) can open the install guide on first run and when the runtime is unavailable) or Docker Desktop / Docker Engine
 - macOS (primary), Windows, or Linux
 
 ## Quick Start
@@ -81,6 +81,7 @@ Use the **Channel** dropdown in the launcher footer (`stable` default, `beta` op
 ## Troubleshooting
 
 - **Docker warning banner** — start Docker Desktop and reopen The Loading Dock(r).
+- **Podman is unavailable** — open the install guide from the onboarding card or warning banner, install Podman, then click Retry.
 - **Launch fails** — check the image name and host port conflicts (`host:container`, e.g. `8080:80`).
 - **Web UI won't load** — ensure the container is **running** and `openUrl` matches your mapped port.
 - **No health/metrics** — container must be running; Docker CLI must be reachable from Bun.

@@ -14,11 +14,12 @@ export function openWebUiWindow(app: DockerApp): string | null {
     return null;
   }
 
+  // Open as a dedicated app-like window: full title is just the app name,
+  // generous size so it feels like a native desktop app rather than a browser tab.
   const win = new BrowserWindow({
-    title: `${app.name} — Web UI`,
+    title: app.name,
     url,
-    frame: { x: 160, y: 140, width: 1024, height: 720 },
-    sandbox: true,
+    frame: { x: 120, y: 80, width: 1280, height: 820 },
   } as any);
 
   win.on("close", () => {

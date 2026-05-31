@@ -42,11 +42,11 @@
 /* ── Light mode — the original ocean-blue palette ───────────── */
 [data-theme="light"] {
   --bg: #003a35;
-  --surface: #3771c5;
-  --surface-deep: #2458a3;
-  --surface-raised: #4280d4;
-  --surface-inset: #2d64b8;
-  --border: #5590e0;
+  --surface: #1f416f;
+  --surface-deep: #132a49;
+  --surface-raised: #28527f;
+  --surface-inset: #193560;
+  --border: #2e5e8e;
   --accent: #219ebc;
   --accent-hover: #1a85a0;
   --text: #e2f4fb;

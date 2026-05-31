@@ -5,6 +5,9 @@ const config = {
     version: "1.2.0",
     icon: "./App_Icon.png",
   },
+  runtime: {
+    exitOnLastWindowClosed: false,
+  },
   build: {
     mac: {
       icons: "./assets/icons/App_Icon.iconset",

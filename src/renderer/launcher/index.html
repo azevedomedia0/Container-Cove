@@ -216,8 +216,11 @@
                 <option value="unless-stopped">Unless stopped</option>
               </select>
             </label>
-            <label>Local Domain <small class="label-hint">.localhost:17300</small>
-              <input id="add-local-domain" type="text" placeholder="myapp" />
+            <label>Local Domain
+              <div class="local-domain-row">
+                <input id="add-local-domain" type="text" placeholder="myapp" class="local-domain-input" />
+                <span class="label-hint">.localhost:17300</span>
+              </div>
             </label>
             <div class="field-section">
               <div class="field-section__header">
@@ -288,8 +291,11 @@
                   <option value="unless-stopped">Unless stopped</option>
                 </select>
               </label>
-              <label>Local Domain <small class="label-hint">.localhost:17300</small>
-                <input id="edit-local-domain" type="text" placeholder="myapp" />
+              <label>Local Domain
+                <div class="local-domain-row">
+                  <input id="edit-local-domain" type="text" placeholder="myapp" class="local-domain-input" />
+                  <span class="label-hint">.localhost:17300</span>
+                </div>
               </label>
             </div>
 

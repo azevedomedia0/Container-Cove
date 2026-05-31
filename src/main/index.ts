@@ -331,8 +331,18 @@ async function handleIpc(message: IpcMessage) {
 
 // ── Setup wizard window ────────────────────────────────────────────────────────
 
+async function runSetupFlow(
+  onProgress: (percent: number, step: string) => void,
+): Promise<{ success: boolean; error?: string; recoveryOptions?: any[] }> {
+  const setupState = new SetupState();
+  return await setupPodman(setupState, onProgress);
+}
+
 function createSetupWindow(): Promise<void> {
   return new Promise((resolve) => {
+    // FIX 4: Set setupStarted flag BEFORE creating window to prevent race condition
+    setupStarted = true;
+
     setupWindow = new BrowserWindow({
       width: 600,
       height: 800,
@@ -345,91 +355,113 @@ function createSetupWindow(): Promise<void> {
       url: "views://setup-wizard/index.html",
     } as any);
 
+    // FIX 9: Add logging when setup window created
+    console.log("[loading-dock] Setup wizard window created.");
+
     const rpc = (setupWindow as any).rpc;
 
-    // Handle setup start
-    rpc.on("setup:start", async () => {
-      setupStarted = true;
-      const setupState = new SetupState();
+    // FIX 1: Use once() for setup:start to auto-unsubscribe
+    rpc.once("setup:start", async () => {
+      try {
+        const result = await runSetupFlow((percent, step) => {
+          // Send progress to setup wizard
+          if (setupWindow) {
+            safeSend(setupWindow.webview, {
+              type: "setup:progress",
+              percentComplete: percent,
+              currentStep: step,
+            });
+          }
+        });
 
-      const result = await setupPodman(setupState, (percent, step) => {
-        // Send progress to setup wizard
-        if (setupWindow) {
-          safeSend(setupWindow.webview, {
-            type: "setup:progress",
-            percentComplete: percent,
-            currentStep: step,
-          });
+        // FIX 7: Add type guard before casting
+        if (!result.success && result.error) {
+          // Type narrowing for error case
+          if (setupWindow) {
+            safeSend(setupWindow.webview, {
+              type: "setup:error",
+              message: result.error,
+              recoveryOptions: (result as any).recoveryOptions || [],
+            });
+          }
+        } else if (result.success) {
+          // Send completion signal
+          if (setupWindow) {
+            safeSend(setupWindow.webview, { type: "setup:complete" });
+          }
+          dockerAvailable = true;
         }
-      });
-
-      if (result.success) {
-        // Send completion signal
+      } catch (err) {
+        recordError("setup:start", String(err));
         if (setupWindow) {
-          safeSend(setupWindow.webview, { type: "setup:complete" });
-        }
-        dockerAvailable = true;
-      } else {
-        // Send error signal
-        if (setupWindow) {
-          const errorResult = result as { success: false; error: string; recoveryOptions: any[] };
           safeSend(setupWindow.webview, {
             type: "setup:error",
-            message: errorResult.error,
-            recoveryOptions: errorResult.recoveryOptions,
+            message: String(err),
+            recoveryOptions: [],
           });
         }
       }
     });
 
-    // Handle setup cancel
-    rpc.on("setup:cancel", () => {
-      setupWindow?.hide();
-      setupWindow = null;
-      app.quit();
+    // FIX 1: Use once() for setup:cancel and FIX 2: Call resolve() before app.quit()
+    rpc.once("setup:cancel", () => {
+      try {
+        setupWindow?.hide();
+        setupWindow = null;
+        resolve(); // FIX 2: Resolve promise before quitting
+      } finally {
+        app.quit();
+      }
     });
 
-    // Handle setup retry
-    rpc.on("setup:retry", async () => {
-      setupStarted = true;
-      const setupState = new SetupState();
+    // FIX 1: Use once() for setup:retry and FIX 6: Extracted to runSetupFlow()
+    rpc.once("setup:retry", async () => {
+      try {
+        const result = await runSetupFlow((percent, step) => {
+          // Send progress to setup wizard
+          if (setupWindow) {
+            safeSend(setupWindow.webview, {
+              type: "setup:progress",
+              percentComplete: percent,
+              currentStep: step,
+            });
+          }
+        });
 
-      const result = await setupPodman(setupState, (percent, step) => {
-        // Send progress to setup wizard
-        if (setupWindow) {
-          safeSend(setupWindow.webview, {
-            type: "setup:progress",
-            percentComplete: percent,
-            currentStep: step,
-          });
+        // FIX 7: Add type guard before casting
+        if (!result.success && result.error) {
+          // Type narrowing for error case
+          if (setupWindow) {
+            safeSend(setupWindow.webview, {
+              type: "setup:error",
+              message: result.error,
+              recoveryOptions: (result as any).recoveryOptions || [],
+            });
+          }
+        } else if (result.success) {
+          // Send completion signal
+          if (setupWindow) {
+            safeSend(setupWindow.webview, { type: "setup:complete" });
+          }
+          dockerAvailable = true;
         }
-      });
-
-      if (result.success) {
-        // Send completion signal
+      } catch (err) {
+        recordError("setup:retry", String(err));
         if (setupWindow) {
-          safeSend(setupWindow.webview, { type: "setup:complete" });
-        }
-        dockerAvailable = true;
-      } else {
-        // Send error signal
-        if (setupWindow) {
-          const errorResult = result as { success: false; error: string; recoveryOptions: any[] };
           safeSend(setupWindow.webview, {
             type: "setup:error",
-            message: errorResult.error,
-            recoveryOptions: errorResult.recoveryOptions,
+            message: String(err),
+            recoveryOptions: [],
           });
         }
       }
     });
 
-    // Handle setup finished
-    rpc.on("setup:finished", () => {
+    // FIX 1: Use once() for setup:finished to auto-unsubscribe
+    // NOTE: Do NOT set launcherReady here - let launcher's dom-ready handler set it (FIX 8)
+    rpc.once("setup:finished", () => {
       setupWindow?.hide();
       setupWindow = null;
-      launcherReady = true;
-      flushPendingTrayBulkAction();
       resolve();
     });
 
@@ -438,13 +470,13 @@ function createSetupWindow(): Promise<void> {
       resolve();
     });
 
-    setupWindow.webview.on("dom-ready", () => {
+    // FIX 3: Consolidate dom-ready handlers into one listener
+    setupWindow.webview.once("dom-ready", () => {
       setupWindow!.show();
-    });
-
-    setupWindow.webview.on("dom-ready", () => {
-      if (setupWindow) {
-        (setupWindow as any).rpc.send["ipc-message"]({ type: "setup:ready" });
+      // FIX 5: Validate rpc.send exists before calling
+      const rpcSend = (setupWindow as any)?.rpc?.send;
+      if (rpcSend && typeof rpcSend["ipc-message"] === "function") {
+        rpcSend["ipc-message"]({ type: "setup:ready" });
       }
     });
   });
@@ -476,8 +508,8 @@ function openLauncher() {
     persistBounds({ x, y, width, height });
   });
 
-  launcherWindow.webview.on("dom-ready", () => {
-    launcherReady = true;
+  // FIX 8: Set launcherReady flag in launcher's dom-ready, not in setup handler
+  launcherWindow.webview.once("dom-ready", () => {
     sendToLauncher({ type: "apps:list", apps: state.apps });
     sendToLauncher({
       type: "docker:availability",
@@ -513,6 +545,8 @@ function openLauncher() {
     broadcastSettingsState();
     broadcastOgImages();
     void handleIpc({ type: "networks:list" } as IpcMessage);
+    // FIX 8: Set launcherReady AFTER all initial state is sent
+    launcherReady = true;
     flushPendingTrayBulkAction();
   });
   (launcherWindow.webview as any).rpc.addMessageListener(

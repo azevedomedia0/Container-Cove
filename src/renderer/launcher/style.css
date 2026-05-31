@@ -619,9 +619,26 @@ body {
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 6px;
   padding: 14px;
-  height: auto;
+  height: 360px;
+  max-height: 80vh;
   min-height: 172px;
   align-items: start;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #f4be69 transparent;
+}
+.app-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.app-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+.app-grid::-webkit-scrollbar-thumb {
+  background: #f4be69;
+  border-radius: 3px;
+}
+.app-grid::-webkit-scrollbar-thumb:hover {
+  background: #e0a84d;
 }
 .grid-resize-handle {
   display: flex;
@@ -911,6 +928,8 @@ body {
   padding: 4px 16px 20px;
   max-height: 380px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #f4be69 transparent;
 }
 .store-panel::-webkit-scrollbar {
   width: 6px;
@@ -919,11 +938,11 @@ body {
   background: transparent;
 }
 .store-panel::-webkit-scrollbar-thumb {
-  background: var(--yellow);
+  background: #f4be69;
   border-radius: 3px;
 }
 .store-panel::-webkit-scrollbar-thumb:hover {
-  background: #d97706;
+  background: #e0a84d;
 }
 
 .rec-grid {

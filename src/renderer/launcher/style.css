@@ -1371,7 +1371,17 @@ body {
 .kv-row input,
 .vol-row input {
   flex: 1;
+  min-width: 0;
   font-size: 12px;
+}
+.kv-row .kv-key {
+  flex: 0 0 90px;
+}
+.kv-row .kv-val {
+  flex: 0 0 130px;
+}
+.vol-row input {
+  flex: 0 0 200px;
 }
 
 .kv-remove,

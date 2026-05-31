@@ -538,6 +538,8 @@ document.getElementById("update-chip")!.addEventListener("click", () => {
 
 function applyTheme(t: "dark" | "light") {
   document.documentElement.setAttribute("data-theme", t);
+  document.body.classList.remove("sl-theme-dark", "sl-theme-light");
+  document.body.classList.add(t === "dark" ? "sl-theme-dark" : "sl-theme-light");
   const sun = document.getElementById("icon-sun")!;
   const moon = document.getElementById("icon-moon")!;
   sun.classList.toggle("hidden", t === "dark");
@@ -1096,13 +1098,17 @@ ev.on("ipc-message", (msg: IpcMessage) => {
       break;
     case "settings:state": {
       applyTheme(msg.theme ?? "dark");
-      (document.getElementById("toggle-open-at-login") as HTMLInputElement).checked = msg.openAtLogin;
-      (document.getElementById("toggle-auto-restart") as HTMLInputElement).checked = msg.autoRestartOnUnhealthy;
-      (document.getElementById("toggle-auto-check-updates") as HTMLInputElement).checked = msg.autoCheckUpdates;
-      (document.getElementById("toggle-mask-secrets") as HTMLInputElement).checked = msg.secretsMaskingEnabled;
-      (document.getElementById("toggle-keychain-secrets") as HTMLInputElement).checked = msg.keychainSecretsEnabled;
-      (document.getElementById("toggle-error-logging") as HTMLInputElement).checked = msg.errorLoggingEnabled;
-      (document.getElementById("toggle-show-onboarding") as HTMLInputElement).checked = msg.showOnboarding;
+      const slSwitch = (id: string, val: boolean) => {
+        const el = document.getElementById(id) as any;
+        if (el) el.checked = val;
+      };
+      slSwitch("toggle-open-at-login", msg.openAtLogin);
+      slSwitch("toggle-auto-restart", msg.autoRestartOnUnhealthy);
+      slSwitch("toggle-auto-check-updates", msg.autoCheckUpdates);
+      slSwitch("toggle-mask-secrets", msg.secretsMaskingEnabled);
+      slSwitch("toggle-keychain-secrets", msg.keychainSecretsEnabled);
+      slSwitch("toggle-error-logging", msg.errorLoggingEnabled);
+      slSwitch("toggle-show-onboarding", msg.showOnboarding);
       dataDir = msg.dataDir;
       updateDataDirDisplays(dataDir);
       systemUid = msg.systemUid;
@@ -1415,6 +1421,13 @@ document.querySelectorAll<HTMLElement>(".modal-tab").forEach((btn) => {
   btn.addEventListener("click", () => switchAddTab(btn.dataset.tab as "app" | "compose"));
 });
 
+document.getElementById("btn-stop-all")!.addEventListener("click", () => {
+  showTrayBulkActionModal("stop-all");
+});
+document.getElementById("btn-restart-all")!.addEventListener("click", () => {
+  showTrayBulkActionModal("restart-all");
+});
+
 document.getElementById("btn-add")!.addEventListener("click", () => {
   switchAddTab("app");
   buildEnvTable("add-env-table", {});
@@ -1597,12 +1610,12 @@ document.getElementById("btn-check-update")?.addEventListener("click", () => {
   setUpdateChip("checking");
 });
 document.getElementById("btn-onboarding-dismiss")?.addEventListener("click", () => {
-  const noStartup = (document.getElementById("onboarding-no-startup") as HTMLInputElement)?.checked ?? false;
+  const noStartup = (document.getElementById("onboarding-no-startup") as any)?.checked ?? false;
   send({ type: "onboarding:dismiss", noStartup });
   hideOnboardingPanel();
 });
 document.getElementById("btn-onboarding-skip")?.addEventListener("click", () => {
-  const noStartup = (document.getElementById("onboarding-no-startup") as HTMLInputElement)?.checked ?? false;
+  const noStartup = (document.getElementById("onboarding-no-startup") as any)?.checked ?? false;
   send({ type: "onboarding:dismiss", noStartup });
   hideOnboardingPanel();
 });
@@ -1619,7 +1632,7 @@ document.getElementById("tray-confirm-accept")?.addEventListener("click", () => 
 });
 document.getElementById("onboarding-panel")?.addEventListener("click", (e) => {
   if (e.target === e.currentTarget) {
-    const noStartup = (document.getElementById("onboarding-no-startup") as HTMLInputElement)?.checked ?? false;
+    const noStartup = (document.getElementById("onboarding-no-startup") as any)?.checked ?? false;
     send({ type: "onboarding:dismiss", noStartup });
     hideOnboardingPanel();
   }
@@ -1673,29 +1686,29 @@ document.getElementById("restart-toast-undo")?.addEventListener("click", () => {
 });
 
 // Settings toggles
-document.getElementById("toggle-open-at-login")!.addEventListener("change", (e) => {
-  send({ type: "settings:open-at-login", enabled: (e.target as HTMLInputElement).checked });
+document.getElementById("toggle-open-at-login")!.addEventListener("sl-change", (e) => {
+  send({ type: "settings:open-at-login", enabled: (e.target as any).checked });
 });
-document.getElementById("toggle-auto-restart")!.addEventListener("change", (e) => {
-  send({ type: "settings:auto-restart", enabled: (e.target as HTMLInputElement).checked });
+document.getElementById("toggle-auto-restart")!.addEventListener("sl-change", (e) => {
+  send({ type: "settings:auto-restart", enabled: (e.target as any).checked });
 });
-document.getElementById("toggle-auto-check-updates")!.addEventListener("change", (e) => {
-  send({ type: "settings:auto-check-updates", enabled: (e.target as HTMLInputElement).checked });
+document.getElementById("toggle-auto-check-updates")!.addEventListener("sl-change", (e) => {
+  send({ type: "settings:auto-check-updates", enabled: (e.target as any).checked });
 });
-document.getElementById("toggle-mask-secrets")!.addEventListener("change", (e) => {
-  send({ type: "secrets:mask", enabled: (e.target as HTMLInputElement).checked });
+document.getElementById("toggle-mask-secrets")!.addEventListener("sl-change", (e) => {
+  send({ type: "secrets:mask", enabled: (e.target as any).checked });
 });
-document.getElementById("toggle-keychain-secrets")!.addEventListener("change", (e) => {
-  send({ type: "secrets:keychain", enabled: (e.target as HTMLInputElement).checked });
+document.getElementById("toggle-keychain-secrets")!.addEventListener("sl-change", (e) => {
+  send({ type: "secrets:keychain", enabled: (e.target as any).checked });
 });
-document.getElementById("toggle-error-logging")!.addEventListener("change", (e) => {
-  send({ type: "settings:error-logging", enabled: (e.target as HTMLInputElement).checked });
+document.getElementById("toggle-error-logging")!.addEventListener("sl-change", (e) => {
+  send({ type: "settings:error-logging", enabled: (e.target as any).checked });
 });
-document.getElementById("toggle-show-onboarding")!.addEventListener("change", (e) => {
-  send({ type: "settings:show-onboarding", enabled: (e.target as HTMLInputElement).checked });
+document.getElementById("toggle-show-onboarding")!.addEventListener("sl-change", (e) => {
+  send({ type: "settings:show-onboarding", enabled: (e.target as any).checked });
 });
-document.getElementById("release-channel")!.addEventListener("change", (e) => {
-  const channel = (e.target as HTMLSelectElement).value as "stable" | "beta";
+document.getElementById("release-channel")!.addEventListener("sl-change", (e) => {
+  const channel = (e.target as any).value as "stable" | "beta";
   send({ type: "update:channel:set", channel });
 });
 document.getElementById("btn-settings-pick-dir")!.addEventListener("click", () => {

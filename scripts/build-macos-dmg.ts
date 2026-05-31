@@ -372,13 +372,10 @@ export async function buildMacOSDMG(options: BuildOptions): Promise<void> {
   try {
     log("Starting macOS DMG build process...");
 
-    // Step 1: Download Podman
-    const podmanBinary = await downloadPodman(options.outputDir);
+    // Note: macOS Podman ships as a .pkg installer only — no standalone binary
+    // to bundle. Podman Machine is initialized at first run instead.
 
-    // Step 2: Bundle Podman into app
-    await bundlePodmanBinary(options.appPath, podmanBinary);
-
-    // Step 3: Code sign (if identity provided)
+    // Step 1: Code sign (if identity provided)
     if (options.signIdentity) {
       await signApp(options.appPath, options.signIdentity);
     } else {
@@ -433,12 +430,14 @@ if (import.meta.main) {
       // Determine app path (from build output or default)
       // Electrobun builds to build/ directory
       const appName = "Container Cove";
-      const appPath = resolve(
-        import.meta.dir,
-        "..",
-        "build",
-        `${appName}.app`
-      );
+      // Try production path first, then dev build path
+      const appPath = (() => {
+        const prodPath = resolve(import.meta.dir, "..", "build", `${appName}.app`);
+        if (existsSync(prodPath)) return prodPath;
+        const devPath = resolve(import.meta.dir, "..", "build", "dev-macos-arm64", `${appName}-dev.app`);
+        if (existsSync(devPath)) return devPath;
+        return prodPath; // will fail below with clear error
+      })();
       const outputDir = resolve(import.meta.dir, "..", "build");
 
       // Validate required paths exist
@@ -452,10 +451,15 @@ if (import.meta.main) {
       }
 
       // Validate required tools are available
-      const requiredTools = ["curl", "tar", "hdiutil"];
-      for (const tool of requiredTools) {
-        const check = await executeCommand(tool, ["--version"]);
-        if (check.code !== 0) {
+      // hdiutil uses 'info' not '--version'; curl/tar use '--version'
+      const toolChecks: Record<string, string[]> = {
+        curl: ["--version"],
+        tar: ["--version"],
+        hdiutil: ["info"],
+      };
+      for (const [tool, args] of Object.entries(toolChecks)) {
+        const check = await executeCommand(tool, args);
+        if (check.code !== 0 && check.code !== 1) {
           console.error(`Error: Required tool '${tool}' not found in PATH`);
           process.exit(1);
         }

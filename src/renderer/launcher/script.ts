@@ -1792,3 +1792,36 @@ if (document.readyState === "loading") {
 } else {
   renderRecommendedApps();
 }
+
+// ── Installed grid drag-to-resize ───────────────────────────────
+(function initGridResize() {
+  const handle = document.getElementById("grid-resize-handle");
+  const grid = document.getElementById("grid");
+  if (!handle || !grid) return;
+
+  let startY = 0;
+  let startH = 0;
+
+  handle.addEventListener("mousedown", (e: MouseEvent) => {
+    startY = e.clientY;
+    startH = grid.getBoundingClientRect().height;
+    document.body.style.cursor = "ns-resize";
+    document.body.style.userSelect = "none";
+
+    function onMove(e: MouseEvent) {
+      const delta = e.clientY - startY;
+      const newH = Math.max(172, Math.min(startH + delta, window.innerHeight * 0.8));
+      grid.style.height = `${newH}px`;
+    }
+
+    function onUp() {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    }
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+})();

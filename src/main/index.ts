@@ -1054,6 +1054,9 @@ function updateTrayMenu() {
       });
   const hasRunning = state.apps.some((a) => a.status === "running");
   const gpuText = latestGpuPercent !== null ? `${latestGpuPercent}%` : "—";
+
+  const cpuDot = latestCpuPercent >= 80 ? "🔴" : latestCpuPercent >= 50 ? "🟡" : "🟢";
+  const gpuDot = latestGpuPercent === null ? "⚪" : latestGpuPercent >= 80 ? "🔴" : latestGpuPercent >= 50 ? "🟡" : "🟢";
   try {
     trayInstance.setMenu([
       { type: "normal", label: "Open Dashboard", action: "open-launcher" },
@@ -1067,7 +1070,7 @@ function updateTrayMenu() {
       { type: "normal", label: "Stop All", action: "tray-stop-all", enabled: hasRunning },
       { type: "normal", label: "Restart All", action: "tray-restart-all", enabled: hasRunning },
       { type: "separator" },
-      { type: "normal", label: `CPU ${latestCpuPercent}%  |  GPU ${gpuText}`, enabled: false },
+      { type: "normal", label: `${cpuDot} CPU ${latestCpuPercent}%   ${gpuDot} GPU ${gpuText}`, enabled: false },
       { type: "separator" },
       { type: "normal", label: "Quit", action: "quit-app" },
     ]);

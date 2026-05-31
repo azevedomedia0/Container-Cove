@@ -1066,6 +1066,9 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+.edit-fields-grid--top {
+  align-items: start;
+}
 .edit-modal__actions {
   flex-shrink: 0;
   margin-top: 10px;

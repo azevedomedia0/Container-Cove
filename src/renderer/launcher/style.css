@@ -22,11 +22,11 @@
 /* ── Dark mode (default) — deep navy-black ──────────────────── */
 :root {
   --bg: #003a35;
-  --surface: #0d1f2e;
-  --surface-deep: #040d14;
-  --surface-raised: #091724;
-  --surface-inset: #081620;
-  --border: #16303d;
+  --surface: #26141c;
+  --surface-deep: #150b10;
+  --surface-raised: #301a23;
+  --surface-inset: #1e0f17;
+  --border: #3d1f2d;
   --accent: #219ebc;
   --accent-hover: #1a85a0;
   --text: #dff0f9;

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Podman Setup — Container Cove</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="setup-wizard">
+      <!-- Permission Screen -->
+      <div id="permission-screen" class="setup-screen active">
+        <div class="setup-content">
+          <h1>Podman Setup Required</h1>
+
+          <h2 class="setup-subtitle">Why?</h2>
+          <p class="setup-description">
+            Container Cove uses Podman to run containers as desktop apps. To ensure a smooth experience, Podman needs elevated permissions to manage system resources like networking, volumes, and container lifecycle events.
+          </p>
+          <p class="setup-description">
+            You'll only see this once. After setup, Container Cove will work seamlessly in the background.
+          </p>
+
+          <p class="setup-description">
+            Learn more: <a href="https://podman.io" target="_blank" class="setup-link">podman.io</a>
+          </p>
+
+          <div class="setup-actions">
+            <button id="btn-permission-cancel" class="btn btn--secondary">Cancel</button>
+            <button id="btn-permission-allow" class="btn btn--primary">Allow</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress Screen -->
+      <div id="progress-screen" class="setup-screen">
+        <div class="setup-content">
+          <h1>Setting up Podman...</h1>
+
+          <div class="progress-container">
+            <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Setup progress">
+              <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <div id="progress-text" class="progress-text">0%</div>
+          </div>
+
+          <p id="progress-step" class="progress-step">Initializing... (Step 1 of 3)</p>
+
+          <div class="setup-actions">
+            <button id="btn-progress-cancel" class="btn btn--ghost">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Screen -->
+      <div id="error-screen" class="setup-screen">
+        <div class="setup-content">
+          <h1 class="error-heading">⚠️ Setup Failed</h1>
+
+          <p id="error-message" class="error-message">
+            An error occurred during setup. Please try again or check the logs for more details.
+          </p>
+
+          <div id="recovery-options" class="recovery-options">
+            <div class="recovery-option">
+              <strong>Loading recovery options...</strong>
+              <p>If this doesn't update, please check your internet connection and try again.</p>
+            </div>
+          </div>
+
+          <div class="setup-actions">
+            <button id="btn-error-retry" class="btn btn--primary">Retry</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

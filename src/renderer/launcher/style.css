@@ -1348,8 +1348,9 @@ body {
 }
 .field-section__header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 8px;
   margin-bottom: 6px;
   font-size: 12px;
   color: var(--muted);

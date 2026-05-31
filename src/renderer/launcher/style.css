@@ -257,6 +257,11 @@ body {
     box-shadow 0.15s;
 }
 .search-mode-btn--active {
+  background: #f4be68;
+  color: #1a1a1a;
+  box-shadow: 0 1px 6px rgba(244, 190, 104, 0.45);
+}
+[data-theme="light"] .search-mode-btn--active {
   background: var(--accent);
   color: #fff;
   box-shadow: 0 1px 6px rgba(33, 158, 188, 0.45);

@@ -271,18 +271,7 @@
               <label>Open URL <input id="edit-url" type="text" placeholder="http://localhost:8080" /></label>
             </div>
 
-            <!-- Row 3: Group + Docker Network -->
-            <div class="edit-fields-grid">
-              <label>Group <input id="edit-group" type="text" placeholder="databases" /></label>
-              <label>Docker Network
-                <div class="network-row">
-                  <select id="edit-network"><option value="">Default</option></select>
-                  <button type="button" class="btn btn--ghost btn--xs" id="edit-network-create" title="Create new network">+ New</button>
-                </div>
-              </label>
-            </div>
-
-            <!-- Row 4: Restart + Local Domain -->
+            <!-- Row 3: Restart Policy + Docker Network -->
             <div class="edit-fields-grid">
               <label>Restart Policy
                 <select id="edit-restart">
@@ -291,6 +280,17 @@
                   <option value="unless-stopped">Unless stopped</option>
                 </select>
               </label>
+              <label>Docker Network
+                <div class="network-row">
+                  <select id="edit-network"><option value="">Default</option></select>
+                  <button type="button" class="btn btn--ghost btn--xs" id="edit-network-create" title="Create new network">+ New</button>
+                </div>
+              </label>
+            </div>
+
+            <!-- Row 4: Group + Local Domain -->
+            <div class="edit-fields-grid">
+              <label>Group <input id="edit-group" type="text" placeholder="databases" /></label>
               <label>Local Domain
                 <div class="local-domain-row">
                   <input id="edit-local-domain" type="text" placeholder="myapp" class="local-domain-input" />

@@ -83,87 +83,45 @@ async function executeCommand(
 }
 
 /**
- * Download Podman binary from GitHub releases
+ * Download and extract Podman binaries from GitHub releases (macOS arm64).
+ * Returns the path to the extracted podman binary.
  */
 async function downloadPodman(outputDir: string): Promise<string> {
-  log("Downloading Podman v4.9.2...");
-
-  if (!existsSync(outputDir)) {
-    mkdirSync(outputDir, { recursive: true });
-  }
-
-  const downloadUrl =
-    "https://github.com/containers/podman/releases/download/v4.9.2/podman-4.9.2-macos-amd64.tar.gz";
-  const tarPath = join(outputDir, "podman-4.9.2-macos-amd64.tar.gz");
+  const arch = process.arch === "arm64" ? "arm64" : "amd64";
+  const zipName = `podman-remote-release-darwin_${arch}.zip`;
+  const downloadUrl = `https://github.com/containers/podman/releases/download/v4.9.2/${zipName}`;
+  const zipPath = join(outputDir, zipName);
   const extractDir = join(outputDir, "podman-extract");
+  const binaryPath = join(extractDir, "podman-4.9.2", "usr", "bin", "podman");
+  const helperPath = join(extractDir, "podman-4.9.2", "usr", "bin", "podman-mac-helper");
 
-  // Clean up previous extraction if exists
-  if (existsSync(extractDir)) {
-    rmSync(extractDir, { recursive: true });
+  if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true });
+
+  // Re-use cached extraction if already done
+  if (existsSync(binaryPath)) {
+    log(`Using cached Podman binary at ${binaryPath}`);
+    return binaryPath;
   }
+
+  log(`Downloading Podman v4.9.2 (${arch})...`);
+  const dl = await executeCommand("curl", ["-L", "--max-time", "120", "-o", zipPath, downloadUrl]);
+  if (dl.code !== 0) throw new Error(`Failed to download Podman: ${dl.stderr || dl.stdout}`);
+  log(`Downloaded to ${zipPath}`);
+
+  if (existsSync(extractDir)) rmSync(extractDir, { recursive: true });
   mkdirSync(extractDir, { recursive: true });
 
-  // Download using curl with timeout (60 seconds)
-  const downloadResult = await executeCommand("curl", [
-    "-L",
-    "--max-time",
-    "60",
-    "--progress-bar",
-    "-o",
-    tarPath,
-    downloadUrl,
-  ]);
-
-  if (downloadResult.code !== 0) {
-    throw new Error(
-      `Failed to download Podman: ${downloadResult.stderr || downloadResult.stdout}`
-    );
-  }
-
-  if (!existsSync(tarPath)) {
-    throw new Error(`Downloaded file not found at ${tarPath}`);
-  }
-
-  log(`Downloaded Podman to ${tarPath}`);
-
-  // Extract tar.gz
   log("Extracting Podman archive...");
-  const extractResult = await executeCommand("tar", [
-    "-xzf",
-    tarPath,
-    "-C",
-    extractDir,
-  ]);
+  const ex = await executeCommand("unzip", ["-o", zipPath, "podman-4.9.2/usr/bin/podman", "podman-4.9.2/usr/bin/podman-mac-helper", "-d", extractDir]);
+  if (ex.code !== 0) throw new Error(`Failed to extract Podman: ${ex.stderr || ex.stdout}`);
 
-  if (extractResult.code !== 0) {
-    throw new Error(
-      `Failed to extract Podman: ${extractResult.stderr || extractResult.stdout}`
-    );
-  }
+  if (!existsSync(binaryPath)) throw new Error(`Podman binary not found after extraction: ${binaryPath}`);
 
-  // Find the podman binary
-  const possiblePaths = [
-    join(extractDir, "podman-4.9.2-macos-amd64", "podman"),
-    join(extractDir, "podman"),
-  ];
+  // Make both binaries executable
+  chmodSync(binaryPath, 0o755);
+  if (existsSync(helperPath)) chmodSync(helperPath, 0o755);
 
-  let binaryPath: string | null = null;
-  for (const path of possiblePaths) {
-    if (existsSync(path)) {
-      binaryPath = path;
-      break;
-    }
-  }
-
-  if (!binaryPath) {
-    // List contents to help debug
-    const listResult = await executeCommand("find", [extractDir, "-name", "podman"]);
-    throw new Error(
-      `Podman binary not found in extracted archive.\n${listResult.stdout}`
-    );
-  }
-
-  log(`Found Podman binary at ${binaryPath}`);
+  log(`Podman binary ready at ${binaryPath}`);
   return binaryPath;
 }
 
@@ -194,20 +152,23 @@ async function bundlePodmanBinary(
   }
 
   const targetPath = join(macosPath, "podman");
+  const helperSrc = join(podmanBinary, "..", "podman-mac-helper");
+  const helperDst = join(macosPath, "podman-mac-helper");
 
-  // Copy binary
+  // Copy podman binary
   copyFileSync(podmanBinary, targetPath);
-  log(`Copied Podman to ${targetPath}`);
-
-  // Make executable
   chmodSync(targetPath, 0o755);
-  log("Set executable permissions on podman binary");
+  log(`Bundled podman → ${targetPath}`);
 
-  // Verify
-  const verifyResult = await executeCommand("file", [targetPath]);
-  if (verifyResult.code === 0) {
-    log(`Verification: ${verifyResult.stdout.trim()}`);
+  // Copy podman-mac-helper if present
+  if (existsSync(helperSrc)) {
+    copyFileSync(helperSrc, helperDst);
+    chmodSync(helperDst, 0o755);
+    log(`Bundled podman-mac-helper → ${helperDst}`);
   }
+
+  const verifyResult = await executeCommand("file", [targetPath]);
+  if (verifyResult.code === 0) log(`Verified: ${verifyResult.stdout.trim()}`);
 }
 
 /**
@@ -372,10 +333,11 @@ export async function buildMacOSDMG(options: BuildOptions): Promise<void> {
   try {
     log("Starting macOS DMG build process...");
 
-    // Note: macOS Podman ships as a .pkg installer only — no standalone binary
-    // to bundle. Podman Machine is initialized at first run instead.
+    // Step 1: Download Podman and bundle into .app
+    const podmanBinary = await downloadPodman(options.outputDir);
+    await bundlePodmanBinary(options.appPath, podmanBinary);
 
-    // Step 1: Code sign (if identity provided)
+    // Step 2: Code sign (if identity provided)
     if (options.signIdentity) {
       await signApp(options.appPath, options.signIdentity);
     } else {

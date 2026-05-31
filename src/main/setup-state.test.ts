@@ -56,4 +56,37 @@ describe("SetupState", () => {
     setupState.setError("TEST_ERROR", "Test error message", []);
     expect(setupState.hasError()).toBe(true);
   });
+
+  test("setStage throws on invalid percentComplete", () => {
+    expect(() =>
+      setupState.setStage("initializing", "Step", -1)
+    ).toThrow();
+    expect(() =>
+      setupState.setStage("initializing", "Step", 101)
+    ).toThrow();
+    expect(() =>
+      setupState.setStage("initializing", "Step", 0)
+    ).not.toThrow();
+    expect(() =>
+      setupState.setStage("initializing", "Step", 100)
+    ).not.toThrow();
+  });
+
+  test("setStage throws on empty currentStep", () => {
+    expect(() =>
+      setupState.setStage("initializing", "", 50)
+    ).toThrow();
+    expect(() =>
+      setupState.setStage("initializing", "  ", 50)
+    ).toThrow();
+    expect(() =>
+      setupState.setStage("initializing", "Valid Step", 50)
+    ).not.toThrow();
+  });
+
+  test("getPlatform returns valid platform", () => {
+    const platform = setupState.getPlatform();
+    const validPlatforms = ["darwin", "win32", "linux"];
+    expect(validPlatforms).toContain(platform);
+  });
 });

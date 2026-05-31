@@ -40,6 +40,18 @@ export class SetupState {
   }
 
   setStage(stage: SetupStage, currentStep: string, percentComplete: number): void {
+    // Validate percentComplete is within bounds
+    if (percentComplete < 0 || percentComplete > 100) {
+      throw new Error(
+        `percentComplete must be between 0 and 100, got ${percentComplete}`
+      );
+    }
+
+    // Validate currentStep is not empty
+    if (!currentStep?.trim()) {
+      throw new Error("currentStep cannot be empty");
+    }
+
     this.progress.stage = stage;
     this.progress.currentStep = currentStep;
     this.progress.percentComplete = percentComplete;
@@ -63,8 +75,12 @@ export class SetupState {
   }
 
   getPlatform(): Platform {
-    const platform = process.platform as Platform;
-    return platform;
+    const platform = process.platform;
+    const validPlatforms: Platform[] = ["darwin", "win32", "linux"];
+    if (!validPlatforms.includes(platform as Platform)) {
+      throw new Error(`Unsupported platform: ${platform}`);
+    }
+    return platform as Platform;
   }
 
   isComplete(): boolean {

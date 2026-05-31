@@ -12,12 +12,19 @@
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.28);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 /* ── Dark mode (default) — deep navy-black ──────────────────── */
 :root {
@@ -598,21 +605,6 @@ body {
   overflow-y: auto;
   max-height: 600px;
   min-height: 172px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
-}
-.app-grid::-webkit-scrollbar {
-  width: 6px;
-}
-.app-grid::-webkit-scrollbar-track {
-  background: transparent;
-}
-.app-grid::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
-}
-.app-grid::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
 }
 
 /* ── Installed app card ─────────────────────────────────────── */

@@ -1722,6 +1722,7 @@ label.settings-item {
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
+  background: #002320;
 }
 .onboarding-hero {
   display: flex;

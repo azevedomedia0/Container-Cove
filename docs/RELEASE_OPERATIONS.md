@@ -1,12 +1,12 @@
 # Release Operations
 
-Container Cove includes bundled Podman (v4.9.2) for each platform. This document covers the complete release process from versioning through artifact distribution.
+The Loading Dock(r) includes bundled Podman (v4.9.2) for each platform. This document covers the complete release process from versioning through artifact distribution.
 
 ## Versioning
 
 - Use [semantic versioning](https://semver.org/).
 - Update `package.json` version per release.
-- Podman version is locked to Container Cove version (e.g., Container Cove 1.2.0 includes Podman 4.9.2).
+- Podman version is locked to The Loading Dock(r) version (e.g., The Loading Dock(r) 1.2.0 includes Podman 4.9.2).
 
 ## Release Checklist
 
@@ -46,7 +46,7 @@ Then test each artifact:
 - [ ] Launch app from built artifact
 - [ ] Verify setup wizard initializes Podman
 - [ ] Launch a container from recommended catalog
-- [ ] Check app name shows "Container Cove"
+- [ ] Check app name shows "The Loading Dock(r)"
 - [ ] Verify version in About/Settings matches
 
 ### 4. Build & Publish
@@ -75,9 +75,9 @@ bun run build:linux-appimage
 bun run build:linux-deb
 
 # Create GitHub release manually
-# 1. Go to https://github.com/ElectroDocker/container-cove/releases/new
+# 1. Go to https://github.com/azevedomedia0/LoadingDock_R/releases/new
 # 2. Tag: v1.3.0
-# 3. Title: "Container Cove 1.3.0"
+# 3. Title: "The Loading Dock(r) 1.3.0"
 # 4. Upload artifacts from `build/` directory
 # 5. Add release notes and publish
 ```
@@ -87,10 +87,10 @@ bun run build:linux-deb
 After release/publish:
 
 - [ ] GitHub Release page shows all artifacts:
-  - `Container Cove-1.3.0.dmg` (macOS)
-  - `Container Cove Setup 1.3.0.exe` (Windows)
-  - `Container Cove-1.3.0-x86_64.AppImage` (Linux)
-  - `container-cove_1.3.0_amd64.deb` (Linux)
+  - `The Loading Dock(r)-1.3.0.dmg` (macOS)
+  - `The Loading Dock(r) Setup 1.3.0.exe` (Windows)
+  - `The Loading Dock(r)-1.3.0-x86_64.AppImage` (Linux)
+  - `loading-dock_1.3.0_amd64.deb` (Linux)
 - [ ] Each artifact has correct file size (see [BUILD.md](./BUILD.md) for expected sizes)
 - [ ] Release notes are published and visible
 
@@ -100,7 +100,7 @@ Include in release notes:
 
 **For macOS:**
 ```
-## What's New in Container Cove 1.3.0
+## What's New in The Loading Dock(r) 1.3.0
 
 [Changes summary]
 
@@ -132,7 +132,7 @@ Complete [QA_SIGNOFF.md](./QA_SIGNOFF.md) on macOS (required) and spot-check Win
 - [ ] Compose import, registry export/import
 - [ ] Settings footer toggles and error export
 - [ ] **Setup wizard** initializes Podman on first launch
-- [ ] App name correctly shows "Container Cove" (not "The Loading Dock(r)")
+- [ ] App name correctly shows "The Loading Dock(r)"
 
 ### 8. Performance (optional)
 
@@ -146,7 +146,7 @@ Optional — record results in QA sign-off or [PERFORMANCE.md](./PERFORMANCE.md)
 
 ### Podman Version Locking
 
-Container Cove 1.2.0 includes **Podman v4.9.2**. This version is baked into:
+The Loading Dock(r) 1.2.0 includes **Podman v4.9.2**. This version is baked into:
 - `build-macos-dmg.ts` — macOS binary location
 - `build-windows-installer.ts` — Windows binary location
 - `build-linux-appimage.ts` — Linux binary
@@ -159,7 +159,7 @@ Only when necessary (security fixes, new features):
 1. **Test new Podman version thoroughly** on all platforms
 2. **Update download URLs** in all build scripts
 3. **Test complete build pipeline** locally
-4. **Bump Container Cove version** (e.g., 1.2.0 → 1.2.1)
+4. **Bump The Loading Dock(r) version** (e.g., 1.2.0 → 1.2.1)
 5. **Update docs**: this file, [BUILD.md](./BUILD.md), [INSTALLATION.md](./INSTALLATION.md)
 6. **Release as new version** with updated Podman
 
@@ -167,8 +167,8 @@ Only when necessary (security fixes, new features):
 
 After building, Podman binaries are embedded in:
 
-- **macOS:** `/Applications/Container Cove.app/Contents/Resources/podman-v4.9.2-darwin`
-- **Windows:** `C:\Program Files\Container Cove\podman-v4.9.2.exe`
+- **macOS:** `/Applications/The Loading Dock(r).app/Contents/Resources/podman-v4.9.2-darwin`
+- **Windows:** `C:\Program Files\The Loading Dock(r)\podman-v4.9.2.exe`
 - **Linux AppImage:** Bundled inside `.AppImage` (run as: `./app.AppImage --appimage-extract podman`)
 - **Linux .deb:** `/opt/container-cove/podman-v4.9.2`
 

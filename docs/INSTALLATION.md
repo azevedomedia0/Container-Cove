@@ -1,14 +1,14 @@
-# Container Cove Installation & First-Run Setup
+# The Loading Dock(r) Installation & First-Run Setup
 
-Container Cove bundles Podman for seamless container management. No terminal needed.
+The Loading Dock(r) bundles Podman for seamless container management. No terminal needed.
 
 ## Installation by Platform
 
 ### macOS
 
-1. Download `Container Cove-1.2.0.dmg` from [releases](https://github.com/ElectroDocker/container-cove/releases)
-2. Open the `.dmg` file and drag `Container Cove.app` to `/Applications`
-3. Launch Container Cove from Applications folder (or Spotlight: `Cmd+Space` → "Container Cove")
+1. Download `The Loading Dock(r)-1.2.0.dmg` from [releases](https://github.com/azevedomedia0/LoadingDock_R/releases)
+2. Open the `.dmg` file and drag `The Loading Dock(r).app` to `/Applications`
+3. Launch The Loading Dock(r) from Applications folder (or Spotlight: `Cmd+Space` → "Loading Dock")
 4. Setup wizard appears (one-time)
    - Click "Allow" to initialize Podman Machine (~2-3 minutes)
    - Progress bar shows initialization steps
@@ -17,16 +17,16 @@ Container Cove bundles Podman for seamless container management. No terminal nee
 
 **Troubleshooting:**
 - If Podman Machine init fails: click "View Troubleshooting Guide"
-- To reinstall: delete `/Applications/Container Cove.app`
+- To reinstall: delete `/Applications/The Loading Dock(r).app`
 - To remove all data: also delete `~/.container-cove/` and `~/.podman/`
 
 ### Windows
 
-1. Download `Container Cove Setup 1.2.0.exe` from [releases](https://github.com/ElectroDocker/container-cove/releases)
+1. Download `The Loading Dock(r) Setup 1.2.0.exe` from [releases](https://github.com/azevedomedia0/LoadingDock_R/releases)
 2. Run installer (no admin elevation needed)
-3. Select installation directory (default: `C:\Program Files\Container Cove`)
+3. Select installation directory (default: `C:\Program Files\The Loading Dock(r)`)
 4. Click "Install" and wait for completion
-5. Launch from Start Menu → Container Cove
+5. Launch from Start Menu → The Loading Dock(r)
 6. Setup wizard appears (one-time)
    - Checks for Docker Desktop first (if installed)
    - Falls back to Podman if Docker unavailable
@@ -38,15 +38,15 @@ Container Cove bundles Podman for seamless container management. No terminal nee
 - If Docker/Podman init fails: check Windows Event Viewer, click retry
 - WSL2 required for Podman on Windows 10/11
 - If WSL2 not available: install from Microsoft Store
-- To uninstall: Control Panel → Add/Remove Programs → Container Cove
+- To uninstall: Control Panel → Add/Remove Programs → The Loading Dock(r)
 
 ### Linux
 
 #### AppImage (Recommended for Portable)
 
 ```bash
-chmod +x Container\ Cove-1.2.0-x86_64.AppImage
-./Container\ Cove-1.2.0-x86_64.AppImage
+chmod +x "The Loading Dock(r)-1.2.0-x86_64.AppImage"
+./"The Loading Dock(r)-1.2.0-x86_64.AppImage"
 ```
 
 No installation needed. Run directly from any directory. Setup wizard appears on first run.
@@ -54,11 +54,11 @@ No installation needed. Run directly from any directory. Setup wizard appears on
 #### .deb Package (For Package Manager)
 
 ```bash
-sudo apt install ./container-cove_1.2.0_amd64.deb
-container-cove  # Launch from terminal or app menu
+sudo apt install ./loading-dock_1.2.0_amd64.deb
+loading-dock  # Launch from terminal or app menu
 ```
 
-Installs to `/opt/container-cove/` with `/usr/bin/container-cove` symlink.
+Installs to `/opt/loading-dock/` with `/usr/bin/loading-dock` symlink.
 
 Setup wizard appears on first run.
 
@@ -66,7 +66,7 @@ Setup wizard appears on first run.
 
 ## First-Run Setup Wizard
 
-When you first launch Container Cove:
+When you first launch The Loading Dock(r):
 
 ```
 ┌────────────────────────────────┐
@@ -107,6 +107,8 @@ Recovery options appear with:
 - **Retry** button — attempt setup again
 - **Cancel** — exit (can retry on next launch)
 
+**Note:** Clearing the setup state by deleting config files will reset the setup wizard to reappear on next launch.
+
 ## System Requirements
 
 | Platform | Requirement | Notes |
@@ -133,19 +135,21 @@ Recovery options appear with:
 
 ```bash
 # Delete app
-rm -rf /Applications/Container\ Cove.app
+rm -rf /Applications/"The Loading Dock(r).app"
 
-# Delete app data and Podman (optional)
+# Delete app data (optional)
 rm -rf ~/.container-cove/
+
+# Delete Podman Machine data (optional, removes all Podman containers/images)
 rm -rf ~/.podman/
 ```
 
 ### Windows
 
-Use Control Panel → Add/Remove Programs → Container Cove, or:
+Use Control Panel → Add/Remove Programs → The Loading Dock(r), or:
 
 ```cmd
-cd "C:\Program Files\Container Cove"
+cd "C:\Program Files\The Loading Dock(r)"
 uninstall.exe
 ```
 
@@ -155,13 +159,13 @@ Alternatively, delete `C:\Users\<Username>\AppData\Local\container-cove\` manual
 
 **AppImage:**
 ```bash
-rm Container\ Cove-1.2.0-x86_64.AppImage
+rm "The Loading Dock(r)-1.2.0-x86_64.AppImage"
 rm -rf ~/.container-cove/  # Optional: delete app data
 ```
 
 **.deb:**
 ```bash
-sudo apt remove container-cove
+sudo apt remove loading-dock
 sudo apt autoremove
 rm -rf ~/.container-cove/  # Optional: delete app data
 ```
@@ -176,17 +180,17 @@ rm -rf ~/.container-cove/  # Optional: delete app data
 - Manual recovery: `podman machine rm default && podman machine init`
 
 **"Podman binary not found":**
-- Bundled binary may be corrupted; reinstall Container Cove from `.dmg`
+- Bundled binary may be corrupted; reinstall The Loading Dock(r) from `.dmg`
 
 ### Windows
 
 **WSL2 not installed:**
-- Container Cove will suggest WSL2 install on first run
+- The Loading Dock(r) will suggest WSL2 install on first run
 - To install manually: `wsl --install` in PowerShell (admin)
 - Requires Windows Update completion and reboot
 
 **"Cannot connect to Podman":**
-- Restart WSL2: `wsl --shutdown`, then launch Container Cove
+- Restart WSL2: `wsl --shutdown`, then launch The Loading Dock(r)
 - Check WSL2 status: `wsl -l -v`
 
 **Docker Desktop preferred but missing:**
@@ -214,17 +218,17 @@ rm -rf ~/.container-cove/  # Optional: delete app data
 
 **"Cannot reach container runtime":**
 - Verify Docker/Podman is actually running
-- Try restarting Container Cove
+- Try restarting The Loading Dock(r)
 - Check network connectivity (some corporate firewalls block container init)
 
 ## Advanced Setup
 
 ### Use Existing Docker Installation
 
-If you have Docker Desktop installed, Container Cove will detect and prefer it:
+If you have Docker Desktop installed, The Loading Dock(r) will detect and prefer it:
 
 1. Ensure Docker Desktop is running
-2. Launch Container Cove
+2. Launch The Loading Dock(r)
 3. Setup wizard will use Docker instead of bundled Podman
 
 ### Custom Podman Path (macOS/Linux)
@@ -233,7 +237,7 @@ For advanced users with custom Podman installations:
 
 1. Edit `~/.container-cove/settings.json`
 2. Add: `"podmanPath": "/path/to/custom/podman"`
-3. Restart Container Cove
+3. Restart The Loading Dock(r)
 
 ### Linux: Switch to System Podman
 
@@ -243,16 +247,16 @@ To use system Podman instead of bundled binary:
 # Install system Podman
 sudo apt install podman
 
-# Edit Container Cove settings
+# Edit The Loading Dock(r) settings
 nano ~/.config/container-cove/settings.json
 
 # Add: "podmanPath": "/usr/bin/podman"
 ```
 
-Restart Container Cove.
+Restart The Loading Dock(r).
 
 ## Getting Help
 
 - **Setup wizard troubleshooting link** — click "Learn More" in wizard
-- **GitHub Issues** — [github.com/ElectroDocker/container-cove/issues](https://github.com/ElectroDocker/container-cove/issues)
-- **Community Discord** — [discord.gg/electrodock](https://discord.gg/electrodock) (if applicable)
+- **GitHub Issues** — [github.com/azevedomedia0/LoadingDock_R/issues](https://github.com/azevedomedia0/LoadingDock_R/issues)
+- **GitHub Discussions** — [github.com/azevedomedia0/LoadingDock_R/discussions](https://github.com/azevedomedia0/LoadingDock_R/discussions)

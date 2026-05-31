@@ -1,6 +1,6 @@
-# Building Container Cove
+# Building The Loading Dock(r)
 
-This guide covers building Container Cove with bundled Podman for all platforms.
+This guide covers building The Loading Dock(r) with bundled Podman for all platforms.
 
 ## Prerequisites
 
@@ -59,7 +59,7 @@ security find-identity -v -p codesigning
 bun run build:dmg
 ```
 
-Output: `build/Container Cove-1.2.0.dmg`
+Output: `build/The Loading Dock(r)-1.2.0.dmg`
 
 **Notarization:** Automatic if `APPLE_ID`, `APPLE_PASSWORD`, and `APPLE_TEAM_ID` are set.
 
@@ -105,7 +105,7 @@ export WINDOWS_SIGN_PASSWORD="certificate_password"
 bun run build:win-installer
 ```
 
-Output: `build\Container Cove Setup 1.2.0.exe`
+Output: `build\The Loading Dock(r) Setup 1.2.0.exe`
 
 **Without Code Signing:**
 
@@ -150,33 +150,33 @@ bun run build:linux-deb
 ```
 
 Output:
-- `build/Container Cove-1.2.0-x86_64.AppImage`
-- `build/container-cove_1.2.0_amd64.deb`
+- `build/The Loading Dock(r)-1.2.0-x86_64.AppImage`
+- `build/loading-dock_1.2.0_amd64.deb`
 
 ## Build Artifacts
 
 All builds include:
 - Electrobun app binaries and assets
 - **Bundled Podman v4.9.2** (platform-specific binary)
-- Runtime metadata: app name ("Container Cove"), version from `package.json`
+- Runtime metadata: app name ("The Loading Dock(r)"), version from `package.json`
 - Platform-specific desktop integration
 
 ### Bundled Podman Information
 
 - **Version:** 4.9.2
 - **Locations:**
-  - macOS: `/Applications/Container Cove.app/Contents/Resources/podman-v4.9.2-darwin`
-  - Windows: `C:\Program Files\Container Cove\podman-v4.9.2.exe`
-  - Linux: `/opt/container-cove/podman-v4.9.2` (AppImage) or via dpkg
+  - macOS: `/Applications/The Loading Dock(r).app/Contents/Resources/podman-v4.9.2-darwin`
+  - Windows: `C:\Program Files\The Loading Dock(r)\podman-v4.9.2.exe`
+  - Linux: `/opt/loading-dock/podman-v4.9.2` (AppImage) or via dpkg
 
 ### File Sizes (Approximate)
 
-| Artifact | Size |
-|----------|------|
-| macOS `.dmg` | ~180 MB |
-| Windows `.exe` installer | ~160 MB |
-| Linux AppImage | ~150 MB |
-| Linux `.deb` package | ~140 MB |
+| Artifact | Size | Notes |
+|----------|------|-------|
+| macOS `.dmg` | ~180 MB | Includes bundled Podman |
+| Windows `.exe` installer | ~160 MB | Includes bundled Podman |
+| Linux AppImage | ~150 MB | Includes bundled Podman |
+| Linux `.deb` package | ~140 MB | Includes bundled Podman |
 
 ## Troubleshooting Builds
 
@@ -223,10 +223,12 @@ set PATH=%PATH%;C:\Program Files (x86)\NSIS
 **Installer corruption:**
 
 ```bash
-# Clean build
+# Clean build — safe to delete build/ entirely
 rm -r build/
 bun run build:win-installer
 ```
+
+All artifacts will be rebuilt from scratch on next `bun run build:*` command.
 
 ### Linux AppImage Issues
 
@@ -245,7 +247,7 @@ chmod +x appimagetool-x86_64.AppImage
 
 ```bash
 # Check glibc requirement
-./Container\ Cove-1.2.0-x86_64.AppImage --version
+./"The Loading Dock(r)-1.2.0-x86_64.AppImage" --version
 
 # May require: glibc 2.29+, kernel 4.4+
 ldd --version
@@ -254,7 +256,7 @@ uname -r
 
 ## Podman Version Management
 
-Podman v4.9.2 is bundled and version-locked to Container Cove 1.2.0.
+Podman v4.9.2 is bundled and version-locked to The Loading Dock(r) 1.2.0.
 
 ### To Update Podman Version
 
@@ -265,12 +267,12 @@ Podman v4.9.2 is bundled and version-locked to Container Cove 1.2.0.
    - `scripts/build-linux-appimage.ts`
    - `scripts/build-linux-deb.ts`
 3. **Update version number in docs** (this file + RELEASE_OPERATIONS.md)
-4. **Bump Container Cove version** in `package.json`
-5. **Release as new Container Cove version**
+4. **Bump The Loading Dock(r) version** in `package.json`
+5. **Release as new The Loading Dock(r) version**
 
 ### Version Locking Rationale
 
-Each Container Cove release locks to a specific Podman version to ensure:
+Each The Loading Dock(r) release locks to a specific Podman version to ensure:
 - Consistent user experience across versions
 - Predictable bug fixes and features
 - Simplified troubleshooting (known Podman version)
@@ -300,24 +302,24 @@ docker run -v $(pwd):/work ubuntu:22.04 \
 
 ```
 build/
-├── Container Cove-1.2.0.dmg              (macOS)
-├── Container Cove Setup 1.2.0.exe        (Windows)
-├── Container Cove-1.2.0-x86_64.AppImage  (Linux)
-├── container-cove_1.2.0_amd64.deb        (Linux)
-├── CHECKSUMS.txt                         (if signing enabled)
-└── SIGNATURES/                           (if signing enabled)
+├── The Loading Dock(r)-1.2.0.dmg              (macOS)
+├── The Loading Dock(r) Setup 1.2.0.exe        (Windows)
+├── The Loading Dock(r)-1.2.0-x86_64.AppImage  (Linux)
+├── loading-dock_1.2.0_amd64.deb               (Linux)
+├── CHECKSUMS.txt                              (if signing enabled)
+└── SIGNATURES/                                (if signing enabled)
 ```
 
 ## CI/CD Integration
 
 ### GitHub Actions
 
-Container Cove includes `.github/workflows/release.yml` for automated releases:
+The Loading Dock(r) includes `.github/workflows/release.yml` for automated releases:
 
 1. Push git tag: `git tag v1.2.0 && git push --tags`
 2. GitHub Actions builds all artifacts
 3. Creates draft release with artifacts attached
-4. Skips notarization in CI (requires secrets)
+4. Skips notarization in CI (requires secrets). To enable: configure `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` in [GitHub Actions secrets](https://github.com/azevedomedia0/LoadingDock_R/settings/secrets/actions)
 
 **Local Build Before Release:**
 

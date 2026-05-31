@@ -1,4 +1,4 @@
-# Container Cove
+# The Loading Dock(r)
 
 Run Docker containers as desktop apps — no terminal needed. Built with [Electrobun](https://electrobun.dev).
 
@@ -10,7 +10,7 @@ Run Docker containers as desktop apps — no terminal needed. Built with [Electr
 
 - [Bun](https://bun.sh) >= 1.0
 - macOS (primary), Windows, or Linux
-- **Podman is bundled with Container Cove** and auto-initializes on first launch (no manual setup required)
+- **Podman is bundled with The Loading Dock(r)** and auto-initializes on first launch (no manual setup required)
   - Alternatively, Docker Desktop or Docker Engine can be used if already installed
 
 ## Quick Start
@@ -20,7 +20,7 @@ bun install
 bun start
 ```
 
-On first launch, Container Cove shows a setup wizard to initialize Podman (one-time, ~2-3 minutes).
+On first launch, The Loading Dock(r) shows a setup wizard to initialize Podman (one-time, ~2-3 minutes).
 
 ## Quality Commands
 
@@ -86,19 +86,19 @@ Use the **Channel** dropdown in the launcher footer (`stable` default, `beta` op
 
 ## Podman Distribution
 
-Container Cove includes a bundled Podman binary for each platform. See [INSTALLATION.md](docs/INSTALLATION.md) for setup wizard details and platform-specific Podman initialization.
+The Loading Dock(r) includes a bundled Podman binary for each platform. See [INSTALLATION.md](docs/INSTALLATION.md) for setup wizard details and platform-specific Podman initialization.
 
 ---
 
 ## Troubleshooting
 
 - **Podman setup failed** — the setup wizard shows recovery options. Check [INSTALLATION.md](docs/INSTALLATION.md) troubleshooting section.
-- **Docker warning banner** — start Docker Desktop and reopen Container Cove (Docker used as fallback if Podman unavailable).
+- **Docker warning banner** — start Docker Desktop and reopen The Loading Dock(r) (Docker used as fallback if Podman unavailable).
 - **Launch fails** — check the image name and host port conflicts (`host:container`, e.g. `8080:80`).
 - **Web UI won't load** — ensure the container is **running** and `openUrl` matches your mapped port.
 - **No health/metrics** — container must be running; Docker CLI or Podman must be reachable from Bun.
 - **Reset apps** — delete `apps.json` from the path above and relaunch.
-- **Desktop icon doesn't launch** — ensure Container Cove is running; the shortcut connects via `localhost:42424`.
+- **Desktop icon doesn't launch** — ensure The Loading Dock(r) is running; the shortcut connects via `localhost:42424`.
 
 ---
 

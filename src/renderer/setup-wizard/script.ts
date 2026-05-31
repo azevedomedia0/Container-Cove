@@ -23,6 +23,17 @@ const ev = new Electroview({} as any);
   this.bunBridge(JSON.stringify({ type: "message", id: name, payload }));
 };
 
+// ── IPC Message Types ───────────────────────────────────────────────
+interface SetupProgressMessage {
+  percentComplete: number;
+  currentStep: string;
+}
+
+interface SetupErrorMessage {
+  message: string;
+  recoveryOptions: RecoveryOption[];
+}
+
 // ── UI State ────────────────────────────────────────────────────────
 type ScreenName = "permission" | "progress" | "error";
 
@@ -30,6 +41,8 @@ let currentScreen: ScreenName = "permission";
 let setupStarted = false;
 
 // ── DOM Elements ────────────────────────────────────────────────────
+// Non-null assertions are safe here because we control the HTML structure in index.html.
+// If any element ID is removed from the HTML, this will throw at runtime—update this list if that happens.
 
 // Permission screen
 const permissionScreen = document.getElementById("permission-screen")!;
@@ -98,8 +111,8 @@ btnErrorRetry.addEventListener("click", () => {
 // ── IPC Listeners ───────────────────────────────────────────────────
 
 // setup:progress — Update progress bar and step info
-ev.on("setup:progress", (msg: any) => {
-  const { percentComplete, currentStep } = msg;
+ev.on("setup:progress", (payload: SetupProgressMessage) => {
+  const { percentComplete, currentStep } = payload;
 
   // Update progress bar width
   progressFill.style.width = `${percentComplete}%`;
@@ -116,6 +129,9 @@ ev.on("setup:progress", (msg: any) => {
 
 // setup:complete — Mark completion and close wizard
 ev.on("setup:complete", () => {
+  // Guard: only process if we're still in progress
+  if (currentScreen !== "progress") return;
+
   // Set progress bar to 100%
   progressFill.style.width = "100%";
   progressText.textContent = "100%";
@@ -131,8 +147,8 @@ ev.on("setup:complete", () => {
 });
 
 // setup:error — Show error screen with recovery options
-ev.on("setup:error", (msg: any) => {
-  const { message, recoveryOptions: options } = msg;
+ev.on("setup:error", (payload: SetupErrorMessage) => {
+  const { message, recoveryOptions: options } = payload;
 
   // Set error message
   errorMessage.textContent = message;
@@ -144,6 +160,12 @@ ev.on("setup:error", (msg: any) => {
 
   if (options && Array.isArray(options)) {
     for (const option of options) {
+      // Validate option has required properties
+      if (!option.label || !option.action) {
+        console.warn("Invalid recovery option:", option);
+        continue; // Skip malformed options
+      }
+
       const optionDiv = document.createElement("div");
       optionDiv.className = "recovery-option";
 
@@ -180,6 +202,8 @@ ev.on("setup:error", (msg: any) => {
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         optionDiv.appendChild(link);
+      } else {
+        console.warn("Unknown recovery action:", option.action);
       }
 
       recoveryOptions.appendChild(optionDiv);

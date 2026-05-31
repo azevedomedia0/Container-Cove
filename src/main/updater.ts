@@ -17,7 +17,7 @@ export type UpdaterCallback =
   | { type: "error"; message: string };
 
 const GITHUB_OWNER = "stevenazevedodesign";
-const GITHUB_REPO = "loading-dock";
+const GITHUB_REPO = "container-cove";
 const API_BASE = "https://api.github.com";
 
 function platformSuffix(): string {

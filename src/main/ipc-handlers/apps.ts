@@ -538,7 +538,7 @@ export async function createDesktopIcon(
 <plist version="1.0">
 <dict>
   <key>CFBundleExecutable</key><string>launch</string>
-  <key>CFBundleIdentifier</key><string>com.loadingdock.shortcut.${app.id}</string>
+  <key>CFBundleIdentifier</key><string>com.stevenazevedodesign.containercove.shortcut.${app.id}</string>
   <key>CFBundleName</key><string>${app.name}</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>${hasIcon ? `
@@ -569,7 +569,7 @@ export function removeDesktopIcon(app: DockerApp): void {
   } catch {}
   try {
     const desktopPath = join(homedir(), "Desktop");
-    const targetBundleId = `com.loadingdock.shortcut.${app.id}`;
+    const targetBundleId = `com.stevenazevedodesign.containercove.shortcut.${app.id}`;
     for (const entry of readdirSync(desktopPath, { withFileTypes: true })) {
       if (!entry.name.endsWith(".app")) continue;
       const plistPath = join(desktopPath, entry.name, "Contents", "Info.plist");

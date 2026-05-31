@@ -1,4 +1,4 @@
-# ElectroDocker v0.2.0
+# Container Cove v0.2.0
 
 ## Highlights
 

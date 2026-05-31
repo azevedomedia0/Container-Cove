@@ -2,7 +2,7 @@
 
 ## Who needs to read this
 
-Anyone running ElectroDocker 0.1.x who is upgrading to 0.2.0, whether by
+Anyone running Container Cove 0.1.x who is upgrading to 0.2.0, whether by
 in-app update, manual download, or building from source.
 
 ---
@@ -15,9 +15,9 @@ Location (same directory as `apps.json`):
 
 | Platform | Path |
 |----------|------|
-| macOS    | `~/Library/Application Support/electrodocker/settings.json` |
-| Windows  | `%APPDATA%\electrodocker\settings.json` |
-| Linux    | `~/.config/electrodocker/settings.json` |
+| macOS    | `~/Library/Application Support/container-cove/settings.json` |
+| Windows  | `%APPDATA%\container-cove\settings.json` |
+| Linux    | `~/.config/container-cove/settings.json` |
 
 This file is created automatically on first run of 0.2.0. If it is absent,
 all settings fall back to safe defaults (stable channel, masking on,

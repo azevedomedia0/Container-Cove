@@ -2,7 +2,7 @@
 import { dirname, join } from "path";
 import type { DockerApp } from "../shared/types";
 
-const APP_DIR_NAME = "loading-dock";
+const APP_DIR_NAME = "container-cove";
 const APPS_FILE_NAME = "apps.json";
 const METRICS_FILE_NAME = "metrics.json";
 

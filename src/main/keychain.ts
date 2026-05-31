@@ -4,7 +4,7 @@
 // Windows → PowerShell + DPAPI (ConvertTo-SecureString / ConvertFrom-SecureString)
 // Linux  → secret-tool (libsecret)
 
-const SERVICE = "loading-dock";
+const SERVICE = "container-cove";
 
 function key(appId: string, envKey: string): string {
   return `${appId}::${envKey}`;
@@ -85,7 +85,7 @@ async function deleteWindows(appId: string, envKey: string): Promise<void> {
 function winStorePath(appId: string, envKey: string): string {
   const appData = process.env.APPDATA ?? "";
   const safe = key(appId, envKey).replace(/[^a-zA-Z0-9_-]/g, "_");
-  return `${appData}\\loading-dock\\secrets\\${safe}.dpapi`;
+  return `${appData}\\container-cove\\secrets\\${safe}.dpapi`;
 }
 
 async function setLinux(appId: string, envKey: string, value: string): Promise<void> {

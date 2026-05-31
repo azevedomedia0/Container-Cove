@@ -41,7 +41,7 @@ Shipped beyond the original MVP scope:
 
 Full visual redesign:
 
-- Renamed app to **Container Cove**; updated all identifiers to `loading-dock`
+- Renamed app to **Container Cove**; updated all identifiers to `container-cove`
 - Cal Sans title font via Bunny Fonts CDN
 - Custom app icon (whale + house) in topbar
 - Custom Iconoir SVG buttons in toolbar (check updates, pull, push, add app)
@@ -56,7 +56,7 @@ Full visual redesign:
 - Transparent scrollbar styling
 - IPC layer fixed for Electrobun ≥1.18.1 RPC envelope format
 - App window: Web UI tab (iframe) + Logs tab with sidebar
-- GitHub repository linked: https://github.com/azevedomedia0/LoadingDock_R
+- GitHub repository linked: https://github.com/azevedomedia0/container-cove
 - MIT License added
 
 ---

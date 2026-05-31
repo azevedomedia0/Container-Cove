@@ -118,7 +118,7 @@ Container Cove includes a bundled Podman binary for each platform. See [INSTALLA
 ## Project Structure
 
 ```
-LoadingDock_R/
+ContainerCove/
 ├── LICENSE
 ├── electrobun.config.ts
 ├── package.json

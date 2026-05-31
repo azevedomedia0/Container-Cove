@@ -75,7 +75,7 @@ bun run build:linux-appimage
 bun run build:linux-deb
 
 # Create GitHub release manually
-# 1. Go to https://github.com/azevedomedia0/LoadingDock_R/releases/new
+# 1. Go to https://github.com/azevedomedia0/container-cove/releases/new
 # 2. Tag: v1.3.0
 # 3. Title: "Container Cove 1.3.0"
 # 4. Upload artifacts from `build/` directory
@@ -90,7 +90,7 @@ After release/publish:
   - `Container Cove-1.3.0.dmg` (macOS)
   - `Container Cove Setup 1.3.0.exe` (Windows)
   - `Container Cove-1.3.0-x86_64.AppImage` (Linux)
-  - `loading-dock_1.3.0_amd64.deb` (Linux)
+  - `container-cove_1.3.0_amd64.deb` (Linux)
 - [ ] Each artifact has correct file size (see [BUILD.md](./BUILD.md) for expected sizes)
 - [ ] Release notes are published and visible
 

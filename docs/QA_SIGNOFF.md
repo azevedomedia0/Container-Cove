@@ -89,7 +89,7 @@ Mark each scenario: ✅ Pass · ❌ Fail (link issue) · ⏭ Skipped (reason)
 |---|----------|-------|
 | 7.1 | Install app via GET → `.app` shortcut appears on Desktop | ⏭ Untested |
 | 7.2 | Shortcut icon shows app's Dashboard Icon image | ⏭ Untested |
-| 7.3 | Double-click shortcut → Loading Dock opens + container launches | ⏭ Untested |
+| 7.3 | Double-click shortcut → Container Cove opens + container launches | ⏭ Untested |
 | 7.4 | Delete app → Desktop shortcut removed | ⏭ Untested |
 
 ## 8. Theme & Settings

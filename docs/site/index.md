@@ -1,4 +1,4 @@
-# ElectroDocker Docs
+# Container Cove Docs
 
 - [MVP Scope](../MVP_SCOPE.md)
 - [Project Board](../PROJECT_BOARD.md)

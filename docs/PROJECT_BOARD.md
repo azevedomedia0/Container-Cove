@@ -49,7 +49,7 @@
 - [x] Added Navidrome, Homebridge, Puter, Guacamole to recommended apps
 - [x] All recommended apps pinned to `:latest`
 - [x] Tailscale moved to Self-hosted Essentials
-- [x] Linked to GitHub — https://github.com/azevedomedia0/LoadingDock_R
+- [x] Linked to GitHub — https://github.com/azevedomedia0/container-cove
 
 ## v1.3 — Polish & Update Flow (shipped)
 

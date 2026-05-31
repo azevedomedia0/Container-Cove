@@ -13,14 +13,14 @@ import {
 describe("registry paths", () => {
   test("uses platform-specific config dir", () => {
     expect(getRegistryDir("darwin", { HOME: "/Users/test" })).toBe(
-      "/Users/test/Library/Application Support/loading-dock",
+      "/Users/test/Library/Application Support/container-cove",
     );
     expect(getRegistryDir("linux", { HOME: "/home/test" })).toBe(
-      "/home/test/.config/loading-dock",
+      "/home/test/.config/container-cove",
     );
     expect(
       getRegistryDir("win32", { APPDATA: "C:/Users/test/AppData/Roaming" }),
-    ).toBe("C:/Users/test/AppData/Roaming/loading-dock");
+    ).toBe("C:/Users/test/AppData/Roaming/container-cove");
   });
 
   test("registry file is apps.json in registry dir", () => {

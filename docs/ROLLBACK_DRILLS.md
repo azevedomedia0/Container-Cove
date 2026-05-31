@@ -25,12 +25,12 @@ rollback path works end-to-end and that user data survives.
 
 1. Note the current app registry (`apps.json`) contents.
 2. Download the v0.1.x artifact from the Releases page.
-3. Quit ElectroDocker 0.2.0 fully (including tray).
+3. Quit Container Cove 0.2.0 fully (including tray).
 4. Replace the application binary / bundle with the v0.1.x artifact:
-   - **macOS:** drag new `.app` over `/Applications/ElectroDocker.app`
+   - **macOS:** drag new `.app` over `/Applications/Container Cove.app`
    - **Windows:** run the v0.1.x installer (`/silent` flag)
    - **Linux:** replace the AppImage file and re-mark executable
-5. Launch ElectroDocker 0.1.x.
+5. Launch Container Cove 0.1.x.
 6. Verify the app grid shows all apps from the seed registry.
 7. Launch one app and confirm it reaches "Running" status.
 8. Confirm log streaming works.
@@ -101,7 +101,7 @@ cause a crash on startup.
 ### Steps
 
 1. Export the registry on Platform A using the ⇪ (export) button.
-2. Copy `electrodocker-apps.json` to Platform B.
+2. Copy `container-cove-apps.json` to Platform B.
 3. Use the ⇩ (import registry) button on Platform B.
 4. Verify all apps appear in the grid.
 5. Attempt to launch one app on Platform B.

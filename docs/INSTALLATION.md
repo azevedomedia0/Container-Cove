@@ -6,9 +6,9 @@ Container Cove bundles Podman for seamless container management. No terminal nee
 
 ### macOS
 
-1. Download `Container Cove-1.2.0.dmg` from [releases](https://github.com/azevedomedia0/LoadingDock_R/releases)
+1. Download `Container Cove-1.2.0.dmg` from [releases](https://github.com/azevedomedia0/container-cove/releases)
 2. Open the `.dmg` file and drag `Container Cove.app` to `/Applications`
-3. Launch Container Cove from Applications folder (or Spotlight: `Cmd+Space` → "Loading Dock")
+3. Launch Container Cove from Applications folder (or Spotlight: `Cmd+Space` → "Container Cove")
 4. Setup wizard appears (one-time)
    - Click "Allow" to initialize Podman Machine (~2-3 minutes)
    - Progress bar shows initialization steps
@@ -22,7 +22,7 @@ Container Cove bundles Podman for seamless container management. No terminal nee
 
 ### Windows
 
-1. Download `Container Cove Setup 1.2.0.exe` from [releases](https://github.com/azevedomedia0/LoadingDock_R/releases)
+1. Download `Container Cove Setup 1.2.0.exe` from [releases](https://github.com/azevedomedia0/container-cove/releases)
 2. Run installer (no admin elevation needed)
 3. Select installation directory (default: `C:\Program Files\Container Cove`)
 4. Click "Install" and wait for completion
@@ -54,11 +54,11 @@ No installation needed. Run directly from any directory. Setup wizard appears on
 #### .deb Package (For Package Manager)
 
 ```bash
-sudo apt install ./loading-dock_1.2.0_amd64.deb
-loading-dock  # Launch from terminal or app menu
+sudo apt install ./container-cove_1.2.0_amd64.deb
+container-cove  # Launch from terminal or app menu
 ```
 
-Installs to `/opt/container-cove/` with `/usr/bin/loading-dock` symlink.
+Installs to `/opt/container-cove/` with `/usr/bin/container-cove` symlink.
 
 Setup wizard appears on first run.
 
@@ -165,7 +165,7 @@ rm -rf ~/.container-cove/  # Optional: delete app data
 
 **.deb:**
 ```bash
-sudo apt remove loading-dock
+sudo apt remove container-cove
 sudo apt autoremove
 rm -rf ~/.container-cove/  # Optional: delete app data
 ```
@@ -258,5 +258,5 @@ Restart Container Cove.
 ## Getting Help
 
 - **Setup wizard troubleshooting link** — click "Learn More" in wizard
-- **GitHub Issues** — [github.com/azevedomedia0/LoadingDock_R/issues](https://github.com/azevedomedia0/LoadingDock_R/issues)
-- **GitHub Discussions** — [github.com/azevedomedia0/LoadingDock_R/discussions](https://github.com/azevedomedia0/LoadingDock_R/discussions)
+- **GitHub Issues** — [github.com/azevedomedia0/container-cove/issues](https://github.com/azevedomedia0/container-cove/issues)
+- **GitHub Discussions** — [github.com/azevedomedia0/container-cove/discussions](https://github.com/azevedomedia0/container-cove/discussions)

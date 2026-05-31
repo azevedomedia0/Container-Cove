@@ -151,7 +151,7 @@ bun run build:linux-deb
 
 Output:
 - `build/Container Cove-1.2.0-x86_64.AppImage`
-- `build/loading-dock_1.2.0_amd64.deb`
+- `build/container-cove_1.2.0_amd64.deb`
 
 ## Build Artifacts
 
@@ -305,7 +305,7 @@ build/
 ├── Container Cove-1.2.0.dmg              (macOS)
 ├── Container Cove Setup 1.2.0.exe        (Windows)
 ├── Container Cove-1.2.0-x86_64.AppImage  (Linux)
-├── loading-dock_1.2.0_amd64.deb               (Linux)
+├── container-cove_1.2.0_amd64.deb               (Linux)
 ├── CHECKSUMS.txt                              (if signing enabled)
 └── SIGNATURES/                                (if signing enabled)
 ```
@@ -319,7 +319,7 @@ Container Cove includes `.github/workflows/release.yml` for automated releases:
 1. Push git tag: `git tag v1.2.0 && git push --tags`
 2. GitHub Actions builds all artifacts
 3. Creates draft release with artifacts attached
-4. Skips notarization in CI (requires secrets). To enable: configure `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` in [GitHub Actions secrets](https://github.com/azevedomedia0/LoadingDock_R/settings/secrets/actions)
+4. Skips notarization in CI (requires secrets). To enable: configure `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` in [GitHub Actions secrets](https://github.com/azevedomedia0/container-cove/settings/secrets/actions)
 
 **Local Build Before Release:**
 

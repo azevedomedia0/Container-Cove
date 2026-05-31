@@ -1426,12 +1426,17 @@ body {
   flex-direction: column;
   gap: 6px;
 }
-.kv-row,
-.vol-row {
+.kv-row {
   display: flex;
   gap: 6px;
   align-items: center;
   width: 100%;
+}
+.vol-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: 90%;
 }
 .kv-row input,
 .vol-row input {

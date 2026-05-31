@@ -260,7 +260,7 @@ async function compileNSIS(
 
   const compileResult = await executeCommand(makensisBin, [
     "/V2", // Verbose output
-    nsisScript,
+    `"${nsisScript}"`,
   ], { timeout: 300000 });
 
   if (compileResult.code !== 0) {
@@ -321,11 +321,11 @@ async function signExecutable(
 
   const signResult = await executeCommand(signToolBin, [
     "sign",
-    "/f", certPath,
+    "/f", `"${certPath}"`,
     "/p", certPassword,
     "/t", "http://timestamp.digicert.com",
     "/d", "Container Cove",
-    exePath,
+    `"${exePath}"`,
   ], { timeout: 300000 });
 
   if (signResult.code !== 0) {
@@ -354,14 +354,30 @@ export async function buildWindowsInstaller(
     const podmanBinary = await downloadPodmanWindows(podmanDir);
     await preparePodmanBinary(podmanBinary, join(options.outputDir, "podman"));
 
-    // Step 3: Compile NSIS installer
+    // Step 3: Validate required assets
+    const requiredAssets = [
+      "assets/icons/App_Icon.ico",
+      "assets/icons/installer-header.bmp",
+      "assets/icons/installer-welcome.bmp"
+    ];
+
+    for (const asset of requiredAssets) {
+      const assetPath = resolve(import.meta.dir, "..", asset);
+      if (!existsSync(assetPath)) {
+        throw new Error(`Missing required asset: ${assetPath}`);
+      }
+    }
+
+    log(`All required assets validated ✓`);
+
+    // Step 4: Compile NSIS installer
     const nsisScript = resolve(
       import.meta.dir,
       "windows-installer.nsi"
     );
     await compileNSIS(nsisScript, makensisBin);
 
-    // Step 4: Code sign (if certificate provided)
+    // Step 5: Code sign (if certificate provided)
     const exePath = join(
       options.outputDir,
       `Container Cove Setup ${options.version}.exe`

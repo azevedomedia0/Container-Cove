@@ -9,6 +9,7 @@
     "build:mac": "bunx electrobun build --platform darwin",
     "build:win": "bunx electrobun build --platform win32",
     "build:linux": "bunx electrobun build --platform linux",
+    "build:dmg": "bun scripts/build-macos-dmg.ts",
     "postinstall": "node scripts/patch-electrobun-rpc.mjs",
     "test": "bun test",
     "lint": "eslint \"src/**/*.ts\" \"electrobun.config.ts\"",

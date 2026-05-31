@@ -21,7 +21,7 @@
 }
 /* ── Dark mode (default) — deep navy-black ──────────────────── */
 :root {
-  --bg: #06111a;
+  --bg: #5ca6ef;
   --surface: #0d1f2e;
   --surface-deep: #040d14;
   --surface-raised: #091724;
@@ -41,7 +41,7 @@
 }
 /* ── Light mode — the original ocean-blue palette ───────────── */
 [data-theme="light"] {
-  --bg: #669bbc;
+  --bg: #5ca6ef;
   --surface: #02395a;
   --surface-deep: #012234;
   --surface-raised: #011a2a;

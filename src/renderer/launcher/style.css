@@ -598,6 +598,21 @@ body {
   overflow-y: auto;
   max-height: 600px;
   min-height: 172px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+.app-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.app-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+.app-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+.app-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 /* ── Installed app card ─────────────────────────────────────── */

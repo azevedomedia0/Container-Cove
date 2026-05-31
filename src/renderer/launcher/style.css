@@ -1436,7 +1436,7 @@ body {
   display: flex;
   gap: 6px;
   align-items: center;
-  width: 90%;
+  width: 81%;
 }
 .kv-row input,
 .vol-row input {

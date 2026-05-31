@@ -288,7 +288,7 @@ async function createDMG(
     "-imagekey",
     "zlib-level=9",
     dmgPath,
-  ]);
+  ], { timeout: 600000 });
 
   if (hdiutilResult.code !== 0) {
     throw new Error(
@@ -337,7 +337,7 @@ async function notarizeDMG(dmgPath: string): Promise<void> {
     "--team-id",
     appleTeamId,
     "--wait",
-  ]);
+  ], { timeout: 1800000 });
 
   if (notarizeResult.code !== 0) {
     // Try older altool approach if notarytool fails
@@ -353,7 +353,7 @@ async function notarizeDMG(dmgPath: string): Promise<void> {
       appleId,
       "-p",
       applePassword,
-    ]);
+    ], { timeout: 1800000 });
 
     if (altoolResult.code !== 0) {
       throw new Error(
@@ -410,48 +410,92 @@ export async function buildMacOSDMG(options: BuildOptions): Promise<void> {
  * CLI entry point
  */
 if (import.meta.main) {
-  // Get app version from package.json
-  const packageJsonPath = resolve(import.meta.dir, "..", "package.json");
-  const packageJson = JSON.parse(
-    fs.readFileSync(packageJsonPath, "utf-8")
-  ) as { version: string };
-  const appVersion = packageJson.version;
+  (async () => {
+    try {
+      // Get app version from package.json
+      const packageJsonPath = resolve(import.meta.dir, "..", "package.json");
 
-  // Determine app path (from build output or default)
-  // Electrobun builds to build/ directory
-  const appName = "Container Cove";
-  const appPath = resolve(
-    import.meta.dir,
-    "..",
-    "build",
-    `${appName}.app`
-  );
-  const outputDir = resolve(import.meta.dir, "..", "build");
+      let appVersion: string;
+      try {
+        const content = fs.readFileSync(packageJsonPath, "utf-8");
+        const packageJson = JSON.parse(content) as { version?: string };
 
-  // Get signing identity from env var
-  const signIdentity = process.env.APPLE_SIGNING_IDENTITY;
+        if (!packageJson.version) {
+          throw new Error("package.json missing 'version' field");
+        }
+        appVersion = packageJson.version;
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        console.error(`Failed to read package.json: ${errorMsg}`);
+        process.exit(1);
+      }
 
-  // Get notarization flag (default: true if credentials present)
-  const shouldNotarize =
-    process.env.APPLE_ID &&
-    process.env.APPLE_PASSWORD &&
-    process.env.APPLE_TEAM_ID;
+      // Determine app path (from build output or default)
+      // Electrobun builds to build/ directory
+      const appName = "Container Cove";
+      const appPath = resolve(
+        import.meta.dir,
+        "..",
+        "build",
+        `${appName}.app`
+      );
+      const outputDir = resolve(import.meta.dir, "..", "build");
 
-  const options: BuildOptions = {
-    appPath,
-    outputDir,
-    version: appVersion,
-    signIdentity,
-    notarize: shouldNotarize ? true : false,
-  };
+      // Validate required paths exist
+      if (!existsSync(appPath)) {
+        console.error(`Error: App bundle not found at ${appPath}`);
+        process.exit(1);
+      }
 
-  log("macOS DMG Build Script");
-  log(`App version: ${appVersion}`);
-  log(`App path: ${appPath}`);
-  log(`Output directory: ${outputDir}`);
-  log(`Code signing: ${signIdentity ? "enabled" : "disabled"}`);
-  log(`Notarization: ${shouldNotarize ? "enabled" : "disabled"}`);
-  log("");
+      if (!existsSync(outputDir)) {
+        mkdirSync(outputDir, { recursive: true });
+      }
 
-  buildMacOSDMG(options);
+      // Validate required tools are available
+      const requiredTools = ["curl", "tar", "hdiutil"];
+      for (const tool of requiredTools) {
+        const check = await executeCommand(tool, ["--version"]);
+        if (check.code !== 0) {
+          console.error(`Error: Required tool '${tool}' not found in PATH`);
+          process.exit(1);
+        }
+      }
+
+      // Get signing identity from env var
+      const signIdentity = process.env.APPLE_SIGNING_IDENTITY;
+
+      // Get notarization flag (default: true if credentials present)
+      const shouldNotarize =
+        process.env.APPLE_ID &&
+        process.env.APPLE_PASSWORD &&
+        process.env.APPLE_TEAM_ID;
+
+      const options: BuildOptions = {
+        appPath,
+        outputDir,
+        version: appVersion,
+        signIdentity,
+        notarize: shouldNotarize ? true : false,
+      };
+
+      log("macOS DMG Build Script");
+      log(`App version: ${appVersion}`);
+      log(`App path: ${appPath}`);
+      log(`Output directory: ${outputDir}`);
+      log(`Code signing: ${signIdentity ? "enabled" : "disabled"}`);
+      log(`Notarization: ${shouldNotarize ? "enabled" : "disabled"}`);
+      log("");
+
+      await buildMacOSDMG(options).catch((err) => {
+        console.error("Build failed:", err instanceof Error ? err.message : String(err));
+        process.exit(1);
+      });
+
+      console.log("✓ macOS DMG build completed successfully");
+      process.exit(0);
+    } catch (err) {
+      console.error("Unexpected error:", err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+  })();
 }

@@ -166,6 +166,8 @@ let isFirstRun = false;
 let pendingTrayBulkAction: "stop-all" | "restart-all" | null = null;
 let startupRestoreIds = new Set<string>();
 let dockerStartPromise: Promise<void> | null = null;
+let latestCpuPercent = 0;
+let latestGpuPercent: number | null = null;
 
 // ogCache persists for the process lifetime; shared with broadcastOgImages()
 const ogCache = new Map<string, string>();
@@ -255,7 +257,9 @@ function safeSend(webview: unknown, message: IpcMessage) {
     try { rpc.send["ipc-message"](message); return; } catch {}
   }
   const sender = (webview as { send?: (n: string, p: IpcMessage) => void })?.send;
-  if (typeof sender === "function") sender("ipc-message", message);
+  if (typeof sender === "function") {
+    try { sender("ipc-message", message); } catch {}
+  }
 }
 
 function recordError(source: string, text: string, appId?: string) {
@@ -568,11 +572,23 @@ function openLauncher() {
     "ipc-message",
     async (message: IpcMessage) => await handleIpc(message),
   );
-  launcherWindow.on("close", () => {
+  // Hide to tray on close instead of quitting — app keeps running in background
+  let _forceQuit = false;
+  launcherWindow.on("close", (e: any) => {
+    if (_forceQuit) return; // allow quit via tray "Quit" item
+    if (e && typeof e.preventDefault === "function") {
+      try { e.preventDefault(); } catch {}
+    }
+    try { launcherWindow?.hide(); } catch {}
+  });
+  launcherWindow.on("closed", () => {
+    // Only fires when window is truly destroyed (forced quit path)
     launcherWindow = null;
     launcherReady = false;
     pendingTrayBulkAction = null;
   });
+  // Expose force-quit flag so tray Quit can bypass hide
+  (launcherWindow as any).__forceQuit = () => { _forceQuit = true; };
 
   if (!dockerAvailable) void ensureDockerRunning();
 }
@@ -582,7 +598,7 @@ function openAppWindow(app: DockerApp) {
   const win = new BrowserWindow({
     title: app.name,
     url: "views://app-window/index.html",
-    frame: { x: 140, y: 120, width: 820, height: 580 },
+    frame: { x: 100, y: 80, width: 920, height: 704 },
   } as any);
   win.webview.on("dom-ready", () => {
     safeSend(win.webview, { type: "app:open-window", app });
@@ -602,7 +618,12 @@ function openAppWindow(app: DockerApp) {
     "ipc-message",
     async (message: IpcMessage) => await handleIpc(message),
   );
-  win.on("close", () => appWindows.delete(app.id));
+  win.on("close", (e: any) => {
+    if (e && typeof e.preventDefault === "function") {
+      e.preventDefault();
+    }
+    win.hide();
+  });
   appWindows.set(app.id, win);
 }
 
@@ -882,7 +903,10 @@ async function collectSystemMetrics(): Promise<{ cpuPercent: number; gpuPercent:
 function startSystemMetricsPolling() {
   const poll = async () => {
     const metrics = await collectSystemMetrics();
+    latestCpuPercent = metrics.cpuPercent;
+    latestGpuPercent = metrics.gpuPercent;
     broadcast({ type: "system:metrics", ...metrics });
+    updateTrayMenu();
   };
   void poll();
   setInterval(() => void poll(), 4000);
@@ -1029,26 +1053,41 @@ function updateTrayMenu() {
         };
       });
   const hasRunning = state.apps.some((a) => a.status === "running");
-  trayInstance.setMenu([
-    { type: "normal", label: "Open Dashboard", action: "open-launcher" },
-    { type: "separator" },
-    ...appItems,
-    { type: "separator" },
-    { type: "normal", label: "Stop All", action: "tray-stop-all", enabled: hasRunning },
-    { type: "normal", label: "Restart All", action: "tray-restart-all", enabled: hasRunning },
-    { type: "separator" },
-    { type: "normal", label: "Settings", action: "open-launcher" },
-    { type: "separator" },
-    { type: "normal", label: "Quit", action: "quit-app" },
-  ]);
+  const gpuText = latestGpuPercent !== null ? `${latestGpuPercent}%` : "—";
+  try {
+    trayInstance.setMenu([
+      { type: "normal", label: "Open Dashboard", action: "open-launcher" },
+      { type: "separator" },
+      {
+        type: "normal",
+        label: "Apps",
+        submenu: appItems,
+      },
+      { type: "separator" },
+      { type: "normal", label: "Stop All", action: "tray-stop-all", enabled: hasRunning },
+      { type: "normal", label: "Restart All", action: "tray-restart-all", enabled: hasRunning },
+      { type: "separator" },
+      { type: "normal", label: `CPU ${latestCpuPercent}%  |  GPU ${gpuText}`, enabled: false },
+      { type: "separator" },
+      { type: "normal", label: "Quit", action: "quit-app" },
+    ]);
+  } catch (err) {
+    console.error("[container-cove] Failed to update tray menu:", err);
+  }
 }
 
 function handleTrayAction(event: unknown) {
   const ev = event as { action?: string; data?: { id?: string } } | undefined;
   const action = ev?.action;
   const id = ev?.data?.id;
-  if (action === "open-launcher") { openLauncher(); return; }
-  if (action === "quit-app") { process.exit(0); }
+  if (!action || action === "open-launcher" || action === "tray-clicked") { openLauncher(); return; }
+  if (action === "quit-app") {
+    // Signal launcher window to allow close before quitting
+    if (launcherWindow) {
+      try { (launcherWindow as any).__forceQuit?.(); } catch {}
+    }
+    process.exit(0);
+  }
   if (action === "tray-app-click" && id) {
     const app = state.apps.find((a) => a.id === id);
     if (!app) return;
@@ -1056,10 +1095,10 @@ function handleTrayAction(event: unknown) {
     else void handleIpc({ type: "app:launch", id });
   }
   if (action === "tray-stop-all") {
-    requestTrayBulkAction("stop-all");
+    void handleIpc({ type: "tray:bulk-action-confirm", action: "stop-all" } as IpcMessage);
   }
   if (action === "tray-restart-all") {
-    requestTrayBulkAction("restart-all");
+    void handleIpc({ type: "tray:bulk-action-confirm", action: "restart-all" } as IpcMessage);
   }
 }
 

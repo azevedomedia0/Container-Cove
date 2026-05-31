@@ -1097,6 +1097,7 @@ body {
 }
 .edit-fields-grid--env-vol {
   grid-template-columns: 1fr 1fr;
+  gap: 0;
   overflow: hidden;
 }
 .edit-fields-grid--env-vol .vol-row input {

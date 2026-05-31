@@ -145,31 +145,72 @@ function stagePayload(
 function writeScripts(scriptsDir: string): void {
   mkdirSync(scriptsDir, { recursive: true });
 
-  // postinstall: initialise Podman machine if not already set up
+  // preinstall: ensure /usr/local/bin exists (absent on clean macOS installs)
+  const preinstall = `#!/bin/bash
+set -e
+echo "[Container Cove] Preparing installation directories..."
+/bin/mkdir -p /usr/local/bin
+/bin/chmod 755 /usr/local/bin
+/bin/mkdir -p /usr/local
+/bin/chmod 755 /usr/local
+echo "[Container Cove] Directories ready"
+exit 0
+`;
+
+  // postinstall: fix permissions and initialise Podman machine
   const postinstall = `#!/bin/bash
 set -e
 
 PODMAN=/usr/local/bin/podman
+HELPER=/usr/local/bin/podman-mac-helper
 
-# Ensure /usr/local/bin is in PATH
-export PATH="/usr/local/bin:$PATH"
+echo "[Container Cove] Verifying Podman installation..."
 
-echo "[Container Cove] Podman installed at $PODMAN"
-
-# Only initialise the machine if one doesn't exist yet
-if "$PODMAN" machine list --format "{{.Name}}" 2>/dev/null | grep -q .; then
-  echo "[Container Cove] Podman machine already exists — skipping init"
+# Ensure binaries are executable
+if [ -f "$PODMAN" ]; then
+  /bin/chmod 755 "$PODMAN"
+  echo "[Container Cove] podman installed at $PODMAN"
 else
-  echo "[Container Cove] Initialising Podman machine…"
-  # Run as the installing user so the machine is owned by them
-  sudo -u "$USER" "$PODMAN" machine init --now 2>/dev/null || true
+  echo "[Container Cove] ERROR: podman binary not found at $PODMAN"
+  exit 1
 fi
 
+if [ -f "$HELPER" ]; then
+  /bin/chmod 755 "$HELPER"
+  echo "[Container Cove] podman-mac-helper installed at $HELPER"
+fi
+
+# Ensure /usr/local/bin is in PATH
+export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
+
+# Get the actual user (not root)
+REAL_USER="\${SUDO_USER:-\$USER}"
+if [ -z "$REAL_USER" ] || [ "$REAL_USER" = "root" ]; then
+  REAL_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
+fi
+
+echo "[Container Cove] Installing for user: $REAL_USER"
+
+# Initialise Podman machine for the real user (skip if already exists)
+if [ -n "$REAL_USER" ] && [ "$REAL_USER" != "root" ]; then
+  if sudo -u "$REAL_USER" "$PODMAN" machine list --format "{{.Name}}" 2>/dev/null | grep -q .; then
+    echo "[Container Cove] Podman machine already exists — skipping init"
+  else
+    echo "[Container Cove] Podman machine will be initialised on first app launch"
+  fi
+fi
+
+echo "[Container Cove] Installation complete"
 exit 0
 `;
 
-  writeFileSync(join(scriptsDir, "postinstall"), postinstall, { mode: 0o755 });
-  log("Wrote postinstall script");
+  writeFileSync(join(scriptsDir, "preinstall"), preinstall);
+  chmodSync(join(scriptsDir, "preinstall"), 0o755);
+
+  writeFileSync(join(scriptsDir, "postinstall"), postinstall);
+  chmodSync(join(scriptsDir, "postinstall"), 0o755);
+
+  log("Wrote preinstall + postinstall scripts");
 }
 
 // ── Build component .pkg ──────────────────────────────────────────

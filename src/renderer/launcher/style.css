@@ -1069,6 +1069,15 @@ body {
 .edit-fields-grid--top {
   align-items: start;
 }
+.edit-fields-grid--env-vol {
+  grid-template-columns: 3fr 2fr;
+  overflow: hidden;
+}
+.edit-fields-grid--env-vol .vol-row input {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+}
 .edit-modal__actions {
   flex-shrink: 0;
   margin-top: 10px;

@@ -1,4 +1,4 @@
-import { BrowserWindow, Tray, ApplicationMenu, Utils } from "electrobun/bun";
+import { BrowserWindow, Tray, ApplicationMenu, Utils, app } from "electrobun/bun";
 import { tmpdir, cpus, loadavg } from "os";
 import { join } from "path";
 import { writeFileSync } from "fs";
@@ -31,6 +31,8 @@ import { handleApps } from "./ipc-handlers/apps";
 import { handleSettings } from "./ipc-handlers/settings";
 import { handleUpdater } from "./ipc-handlers/updater";
 import { handleRegistry } from "./ipc-handlers/registry";
+import { setupPodman } from "./podman-setup";
+import { SetupState } from "./setup-state";
 
 // ── Tray icon ─────────────────────────────────────────────────────────────────
 const TRAY_ICON_B64 =
@@ -139,7 +141,9 @@ function getPodmanStateHint(
 // ── Process-level state ───────────────────────────────────────────────────────
 
 let launcherWindow: InstanceType<typeof BrowserWindow> | null = null;
+let setupWindow: InstanceType<typeof BrowserWindow> | null = null;
 let launcherReady = false;
+let setupStarted = false;
 const appWindows = new Map<string, InstanceType<typeof BrowserWindow>>();
 const logHistory = new Map<string, string[]>();
 let dockerAvailable = false;
@@ -325,6 +329,127 @@ async function handleIpc(message: IpcMessage) {
   if (await handleRegistry(message, ctx)) return;
 }
 
+// ── Setup wizard window ────────────────────────────────────────────────────────
+
+function createSetupWindow(): Promise<void> {
+  return new Promise((resolve) => {
+    setupWindow = new BrowserWindow({
+      width: 600,
+      height: 800,
+      minWidth: 500,
+      minHeight: 600,
+      webPreferences: {
+        sandbox: false,
+      },
+      show: false,
+      url: "views://setup-wizard/index.html",
+    } as any);
+
+    const rpc = (setupWindow as any).rpc;
+
+    // Handle setup start
+    rpc.on("setup:start", async () => {
+      setupStarted = true;
+      const setupState = new SetupState();
+
+      const result = await setupPodman(setupState, (percent, step) => {
+        // Send progress to setup wizard
+        if (setupWindow) {
+          safeSend(setupWindow.webview, {
+            type: "setup:progress",
+            percentComplete: percent,
+            currentStep: step,
+          });
+        }
+      });
+
+      if (result.success) {
+        // Send completion signal
+        if (setupWindow) {
+          safeSend(setupWindow.webview, { type: "setup:complete" });
+        }
+        dockerAvailable = true;
+      } else {
+        // Send error signal
+        if (setupWindow) {
+          const errorResult = result as { success: false; error: string; recoveryOptions: any[] };
+          safeSend(setupWindow.webview, {
+            type: "setup:error",
+            message: errorResult.error,
+            recoveryOptions: errorResult.recoveryOptions,
+          });
+        }
+      }
+    });
+
+    // Handle setup cancel
+    rpc.on("setup:cancel", () => {
+      setupWindow?.hide();
+      setupWindow = null;
+      app.quit();
+    });
+
+    // Handle setup retry
+    rpc.on("setup:retry", async () => {
+      setupStarted = true;
+      const setupState = new SetupState();
+
+      const result = await setupPodman(setupState, (percent, step) => {
+        // Send progress to setup wizard
+        if (setupWindow) {
+          safeSend(setupWindow.webview, {
+            type: "setup:progress",
+            percentComplete: percent,
+            currentStep: step,
+          });
+        }
+      });
+
+      if (result.success) {
+        // Send completion signal
+        if (setupWindow) {
+          safeSend(setupWindow.webview, { type: "setup:complete" });
+        }
+        dockerAvailable = true;
+      } else {
+        // Send error signal
+        if (setupWindow) {
+          const errorResult = result as { success: false; error: string; recoveryOptions: any[] };
+          safeSend(setupWindow.webview, {
+            type: "setup:error",
+            message: errorResult.error,
+            recoveryOptions: errorResult.recoveryOptions,
+          });
+        }
+      }
+    });
+
+    // Handle setup finished
+    rpc.on("setup:finished", () => {
+      setupWindow?.hide();
+      setupWindow = null;
+      launcherReady = true;
+      flushPendingTrayBulkAction();
+      resolve();
+    });
+
+    setupWindow.on("closed", () => {
+      setupWindow = null;
+      resolve();
+    });
+
+    setupWindow.webview.on("dom-ready", () => {
+      setupWindow!.show();
+    });
+
+    setupWindow.webview.on("dom-ready", () => {
+      if (setupWindow) {
+        (setupWindow as any).rpc.send["ipc-message"]({ type: "setup:ready" });
+      }
+    });
+  });
+}
+
 // ── Window management ─────────────────────────────────────────────────────────
 
 function openLauncher() {
@@ -475,6 +600,21 @@ async function restartAppForHealth(app: DockerApp) {
   }
 }
 
+// ── First-run setup check ──────────────────────────────────────────────────────
+
+async function checkAndRunSetup(): Promise<boolean> {
+  const runtimeAvailable = await isDockerAvailable();
+
+  if (!runtimeAvailable && !setupStarted) {
+    console.log("[loading-dock] Podman/Docker not available — launching setup wizard…");
+    await createSetupWindow();
+    // After setup completes or is cancelled, check again
+    return await isDockerAvailable();
+  }
+
+  return runtimeAvailable;
+}
+
 // ── Startup ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -513,6 +653,15 @@ async function main() {
   startLaunchServer();
   setupTray();
   setupMenu();
+
+  // Run setup wizard if Podman/Docker is not available on first run
+  const runtimeReady = await checkAndRunSetup();
+
+  if (!runtimeReady && !setupStarted) {
+    console.error("[loading-dock] Podman/Docker not available after setup attempt. Exiting.");
+    process.exit(1);
+  }
+
   openLauncher();
   startRuntimeTelemetry();
   startSystemMetricsPolling();

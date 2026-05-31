@@ -159,4 +159,12 @@ export type IpcMessage =
   | { type: "dialog:pick-folder"; callbackId: string }
   | { type: "dialog:folder-result"; callbackId: string; path: string }
   | { type: "dialog:folder-cancelled"; callbackId: string }
-  | { type: "desktop:shortcut:progress"; state: "creating" | "done"; appName: string };
+  | { type: "desktop:shortcut:progress"; state: "creating" | "done"; appName: string }
+  | { type: "setup:ready" }
+  | { type: "setup:start" }
+  | { type: "setup:cancel" }
+  | { type: "setup:retry" }
+  | { type: "setup:finished" }
+  | { type: "setup:progress"; percentComplete: number; currentStep: string }
+  | { type: "setup:complete" }
+  | { type: "setup:error"; message: string; recoveryOptions: Array<{ label: string; action: string; url?: string; description?: string; command?: string }> };

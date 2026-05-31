@@ -19,6 +19,9 @@ const config = {
       "app-window": {
         entrypoint: "./src/renderer/app-window/index.html",
       },
+      "setup-wizard": {
+        entrypoint: "./src/renderer/setup-wizard/index.html",
+      },
     },
   },
 } as const;

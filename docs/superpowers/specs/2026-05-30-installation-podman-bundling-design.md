@@ -119,11 +119,11 @@ Progress milestones:
 
 **Installer:**
 - Standard drag-and-drop DMG (no custom installer scripts)
-- User drags `The Loading Dock(r).app` to `/Applications`
+- User drags `Container Cove.app` to `/Applications`
 - Complete once app is copied
 
 **App Bundle:**
-- Podman binary at `The Loading Dock(r).app/Contents/MacOS/podman`
+- Podman binary at `Container Cove.app/Contents/MacOS/podman`
 - Embedded in signed/notarized app bundle (binary is part of code signature)
 
 **First-Run Initialization:**
@@ -167,13 +167,13 @@ Could not initialize Podman Machine. Try:
 
 **Installer:**
 - Standard Windows .exe installer (NSIS or Inno Setup)
-- Installs app to `%PROGRAMFILES%\The Loading Dock(r)\`
+- Installs app to `%PROGRAMFILES%\Container Cove\`
 - Creates Start Menu shortcut
 - Installer runs in user mode (no UAC prompt for app install)
 - First-run Podman Machine initialization may require UAC elevation if WSL2 needs setup (shown on first launch, not during install)
 
 **App Package:**
-- Podman binary at `%PROGRAMFILES%\The Loading Dock(r)\podman.exe`
+- Podman binary at `%PROGRAMFILES%\Container Cove\podman.exe`
 - Installer extracts to fixed location
 
 **First-Run Initialization:**
@@ -225,8 +225,8 @@ No working runtime found. Try:
 **Installer:**
 
 **AppImage:**
-- Single portable executable: `The Loading Dock(r)-1.2.0-x86_64.AppImage`
-- No installation required, run directly: `./The Loading Dock(r)-1.2.0-x86_64.AppImage`
+- Single portable executable: `Container Cove-1.2.0-x86_64.AppImage`
+- No installation required, run directly: `./Container Cove-1.2.0-x86_64.AppImage`
 - Bundles Podman binary inside AppImage
 - User can copy to `~/.local/bin/` or `~/Applications/` for convenience
 

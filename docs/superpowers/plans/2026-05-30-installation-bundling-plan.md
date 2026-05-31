@@ -218,7 +218,7 @@ Create `src/renderer/setup-wizard/index.html`:
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Podman Setup — The Loading Dock(r)</title>
+    <title>Podman Setup — Container Cove</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
@@ -1110,8 +1110,8 @@ Modify `electrobun.config.ts`:
 ```typescript
 const config = {
   app: {
-    name: "The Loading Dock(r)",
-    identifier: "com.stevenazevedodesign.loadingdock",
+    name: "Container Cove",
+    identifier: "com.stevenazevedodesign.containercove",
     version: "1.2.0",
     icon: "./App_Icon.png",
   },
@@ -1297,7 +1297,7 @@ async function main() {
 
   // Step 3: Copy Podman to app bundle
   console.log("📦 Embedding Podman in app bundle...");
-  const appBundle = join(BUILD_DIR, "The Loading Dock(r).app");
+  const appBundle = join(BUILD_DIR, "Container Cove.app");
   const macosDir = join(appBundle, "Contents", "MacOS");
   const bundledPodman = join(macosDir, "podman");
 
@@ -1336,7 +1336,7 @@ async function main() {
   await $`cp -r ${appBundle} ${tempDir}/`;
 
   // Create DMG with hdiutil
-  await $`hdiutil create -volname "The Loading Dock(r)" -srcfolder ${tempDir} -ov -format UDZO ${dmgPath}`;
+  await $`hdiutil create -volname "Container Cove" -srcfolder ${tempDir} -ov -format UDZO ${dmgPath}`;
 
   console.log(`✅ DMG created: ${dmgPath}`);
 
@@ -1411,15 +1411,15 @@ git commit -m "feat: add macOS DMG builder with embedded Podman"
 Create `scripts/windows-installer.nsi`:
 
 ```nsis
-; The Loading Dock(r) Windows Installer
+; Container Cove Windows Installer
 ; Uses NSIS (Nullsoft Scriptable Install System)
 
 !include "MUI2.nsh"
 
-Name "The Loading Dock(r) 1.2.0"
+Name "Container Cove 1.2.0"
 OutFile "..\..\dist\The-Loading-Dock-r-1.2.0-setup.exe"
-InstallDir "$PROGRAMFILES\The Loading Dock(r)"
-InstallDirRegKey HKCU "Software\The Loading Dock(r)" "InstallPath"
+InstallDir "$PROGRAMFILES\Container Cove"
+InstallDirRegKey HKCU "Software\Container Cove" "InstallPath"
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
@@ -1438,21 +1438,21 @@ Section "Install"
   File "build\podman.exe"
   
   ; Create shortcuts
-  CreateDirectory "$SMPROGRAMS\The Loading Dock(r)"
-  CreateShortcut "$SMPROGRAMS\The Loading Dock(r)\The Loading Dock(r).lnk" "$INSTDIR\The Loading Dock(r).exe"
-  CreateShortcut "$SMPROGRAMS\The Loading Dock(r)\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
-  CreateShortCut "$DESKTOP\The Loading Dock(r).lnk" "$INSTDIR\The Loading Dock(r).exe"
+  CreateDirectory "$SMPROGRAMS\Container Cove"
+  CreateShortcut "$SMPROGRAMS\Container Cove\Container Cove.lnk" "$INSTDIR\Container Cove.exe"
+  CreateShortcut "$SMPROGRAMS\Container Cove\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
+  CreateShortCut "$DESKTOP\Container Cove.lnk" "$INSTDIR\Container Cove.exe"
   
   ; Write registry
-  WriteRegStr HKCU "Software\The Loading Dock(r)" "InstallPath" "$INSTDIR"
+  WriteRegStr HKCU "Software\Container Cove" "InstallPath" "$INSTDIR"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 SectionEnd
 
 Section "Uninstall"
   RMDir /r "$INSTDIR"
-  RMDir /r "$SMPROGRAMS\The Loading Dock(r)"
-  Delete "$DESKTOP\The Loading Dock(r).lnk"
-  DeleteRegKey HKCU "Software\The Loading Dock(r)"
+  RMDir /r "$SMPROGRAMS\Container Cove"
+  Delete "$DESKTOP\Container Cove.lnk"
+  DeleteRegKey HKCU "Software\Container Cove"
 SectionEnd
 ```
 
@@ -1616,7 +1616,7 @@ async function main() {
   await $`mkdir -p ${appDir}/usr/share/applications`;
 
   // Copy app files
-  const builtApp = join(BUILD_DIR, "dev-linux-x64", "The Loading Dock(r)");
+  const builtApp = join(BUILD_DIR, "dev-linux-x64", "Container Cove");
   await $`cp -r ${builtApp} ${appDirBin}/loading-dock`;
 
   // Copy Podman
@@ -1626,7 +1626,7 @@ async function main() {
   // Create .desktop file
   const desktopFile = `[Desktop Entry]
 Type=Application
-Name=The Loading Dock(r)
+Name=Container Cove
 Exec=loading-dock
 Icon=loading-dock
 Categories=Utility;
@@ -1675,7 +1675,7 @@ Version: 1.2.0
 Architecture: amd64
 Maintainer: Steven Azevedo <stevenazevedodesign@gmail.com>
 Description: Run containers as desktop apps
- The Loading Dock(r) is a desktop app launcher for containers.
+ Container Cove is a desktop app launcher for containers.
  Bundles Podman for zero-configuration setup.`;
 
   await $`mkdir -p ${debDir}/DEBIAN`;
@@ -1744,7 +1744,7 @@ Modify `README.md`, replace the Prerequisites section:
 ### macOS
 Download the latest [.dmg release](https://github.com/stevenazevedodesign/loading-dock/releases):
 1. Open `The-Loading-Dock-r-*.dmg`
-2. Drag `The Loading Dock(r).app` to `/Applications`
+2. Drag `Container Cove.app` to `/Applications`
 3. Launch the app — Podman Machine initializes automatically on first run
 
 ### Windows
@@ -1780,7 +1780,7 @@ Create `docs/INSTALLATION.md`:
 
 1. Download `The-Loading-Dock-r-1.2.0.dmg` from [Releases](https://github.com/stevenazevedodesign/loading-dock/releases)
 2. Open the .dmg file
-3. Drag `The Loading Dock(r).app` to `/Applications`
+3. Drag `Container Cove.app` to `/Applications`
 4. Eject the .dmg (safe to delete)
 5. Launch from Applications folder or Spotlight
 

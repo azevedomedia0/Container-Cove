@@ -9,8 +9,10 @@ export type Platform = "darwin" | "win32" | "linux";
 
 export interface RecoveryOption {
   label: string;
-  action: string;
+  action: "retry" | "fallback-docker" | "open-docs" | "open-uninstall-guide" | "cancel";
   url?: string;
+  description?: string;
+  command?: string;
 }
 
 export interface SetupProgress {

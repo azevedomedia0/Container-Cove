@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach } from "bun:test";
-import { SetupState } from "./setup-state";
+import { SetupState, RecoveryOption } from "./setup-state";
 
 describe("SetupState", () => {
   let setupState: SetupState;
@@ -25,15 +25,15 @@ describe("SetupState", () => {
   });
 
   test("sets error state with recovery options", () => {
-    const recoveryOptions = [
+    const recoveryOptions: RecoveryOption[] = [
       {
         label: "Retry",
         action: "retry",
       },
       {
         label: "View Docs",
-        action: "help",
-        url: "https://example.com/help",
+        action: "open-docs",
+        url: "https://example.com/docs",
       },
     ];
     setupState.setError("PODMAN_MISSING", "Podman not found", recoveryOptions);

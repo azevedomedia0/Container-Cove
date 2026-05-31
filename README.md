@@ -1,4 +1,4 @@
-# The Loading Dock(r)
+# Container Cove
 
 Run Docker containers as desktop apps — no terminal needed. Built with [Electrobun](https://electrobun.dev).
 
@@ -9,8 +9,9 @@ Run Docker containers as desktop apps — no terminal needed. Built with [Electr
 ## Prerequisites
 
 - [Bun](https://bun.sh) >= 1.0
-- [Podman](https://podman.io/docs/installation) (recommended; The Loading Dock(r) can open the install guide on first run and when the runtime is unavailable) or Docker Desktop / Docker Engine
 - macOS (primary), Windows, or Linux
+- **Podman is bundled with Container Cove** and auto-initializes on first launch (no manual setup required)
+  - Alternatively, Docker Desktop or Docker Engine can be used if already installed
 
 ## Quick Start
 
@@ -18,6 +19,8 @@ Run Docker containers as desktop apps — no terminal needed. Built with [Electr
 bun install
 bun start
 ```
+
+On first launch, Container Cove shows a setup wizard to initialize Podman (one-time, ~2-3 minutes).
 
 ## Quality Commands
 
@@ -31,10 +34,13 @@ bun run test
 ## Build
 
 ```bash
-bun run build:mac      # macOS .app
-bun run build:win      # Windows
-bun run build:linux    # Linux
+bun run build:dmg             # macOS .dmg (requires code signing)
+bun run build:win-installer   # Windows .exe installer
+bun run build:linux-appimage  # Linux AppImage
+bun run build:linux-deb       # Linux .deb package
 ```
+
+See [BUILD.md](docs/BUILD.md) for detailed build instructions and environment variables.
 
 ---
 
@@ -62,13 +68,13 @@ App definitions are stored in `apps.json` in the OS-native config directory:
 
 | Platform | Path |
 |----------|------|
-| macOS | `~/Library/Application Support/loading-dock/apps.json` |
-| Linux | `${XDG_CONFIG_HOME:-~/.config}/loading-dock/apps.json` |
-| Windows | `%APPDATA%/loading-dock/apps.json` |
+| macOS | `~/Library/Application Support/container-cove/apps.json` |
+| Linux | `${XDG_CONFIG_HOME:-~/.config}/container-cove/apps.json` |
+| Windows | `%APPDATA%/container-cove/apps.json` |
 
 Same folder also contains: `settings.json`, `metrics.json`, `errors.jsonl`.
 
-App data volumes are stored under `~/.loading-dock/<app-name>/`.
+App data volumes are stored under `~/.container-cove/<app-name>/`.
 
 ---
 
@@ -78,15 +84,21 @@ Use the **Channel** dropdown in the launcher footer (`stable` default, `beta` op
 
 ---
 
+## Podman Distribution
+
+Container Cove includes a bundled Podman binary for each platform. See [INSTALLATION.md](docs/INSTALLATION.md) for setup wizard details and platform-specific Podman initialization.
+
+---
+
 ## Troubleshooting
 
-- **Docker warning banner** — start Docker Desktop and reopen The Loading Dock(r).
-- **Podman is unavailable** — open the install guide from the onboarding card or warning banner, install Podman, then click Retry.
+- **Podman setup failed** — the setup wizard shows recovery options. Check [INSTALLATION.md](docs/INSTALLATION.md) troubleshooting section.
+- **Docker warning banner** — start Docker Desktop and reopen Container Cove (Docker used as fallback if Podman unavailable).
 - **Launch fails** — check the image name and host port conflicts (`host:container`, e.g. `8080:80`).
 - **Web UI won't load** — ensure the container is **running** and `openUrl` matches your mapped port.
-- **No health/metrics** — container must be running; Docker CLI must be reachable from Bun.
+- **No health/metrics** — container must be running; Docker CLI or Podman must be reachable from Bun.
 - **Reset apps** — delete `apps.json` from the path above and relaunch.
-- **Desktop icon doesn't launch** — ensure The Loading Dock(r) is running; the shortcut connects via `localhost:42424`.
+- **Desktop icon doesn't launch** — ensure Container Cove is running; the shortcut connects via `localhost:42424`.
 
 ---
 

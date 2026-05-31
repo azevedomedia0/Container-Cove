@@ -356,15 +356,10 @@
 
               <div class="settings-group">
                 <div class="settings-group__label">Storage</div>
-                <div class="settings-card">
-                  <div class="settings-item">
-                    <div class="settings-item__icon settings-item__icon--blue">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                    </div>
-                    <div class="settings-item__text">
-                      <span class="settings-item__label">App data location</span>
-                      <span id="settings-datadir-path" class="settings-item__desc settings-item__desc--mono">~/.container-cove</span>
-                    </div>
+                <div class="settings-item">
+                  <span class="settings-item__label">App data location</span>
+                  <div class="settings-item__right">
+                    <span id="settings-datadir-path" class="settings-path">~/.container-cove</span>
                     <button id="btn-settings-pick-dir" class="settings-item__action">Browse</button>
                   </div>
                 </div>
@@ -372,89 +367,53 @@
 
               <div class="settings-group">
                 <div class="settings-group__label">Startup</div>
-                <div class="settings-card">
-                  <label class="settings-item">
-                    <div class="settings-item__icon settings-item__icon--green">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 7 13 17 8 12 1 5"/><polyline points="16 7 23 7 23 14"/></svg>
-                    </div>
-                    <span class="settings-item__label">Open at Login</span>
-                    <input type="checkbox" id="toggle-open-at-login" class="settings-toggle" />
-                  </label>
-                  <div class="settings-divider"></div>
-                  <label class="settings-item">
-                    <div class="settings-item__icon settings-item__icon--orange">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                    </div>
-                    <span class="settings-item__label">Show welcome guide</span>
-                    <input type="checkbox" id="toggle-show-onboarding" class="settings-toggle" />
-                  </label>
-                </div>
+                <label class="settings-item">
+                  <span class="settings-item__label">Open at Login</span>
+                  <input type="checkbox" id="toggle-open-at-login" class="settings-toggle" />
+                </label>
+                <label class="settings-item">
+                  <span class="settings-item__label">Show welcome guide</span>
+                  <input type="checkbox" id="toggle-show-onboarding" class="settings-toggle" />
+                </label>
               </div>
 
               <div class="settings-group">
                 <div class="settings-group__label">Containers</div>
-                <div class="settings-card">
-                  <label class="settings-item">
-                    <div class="settings-item__icon settings-item__icon--teal">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.4"/></svg>
-                    </div>
-                    <span class="settings-item__label">Auto-restart unhealthy</span>
-                    <input type="checkbox" id="toggle-auto-restart" class="settings-toggle" />
-                  </label>
-                </div>
+                <label class="settings-item">
+                  <span class="settings-item__label">Auto-restart unhealthy</span>
+                  <input type="checkbox" id="toggle-auto-restart" class="settings-toggle" />
+                </label>
               </div>
 
               <div class="settings-group">
                 <div class="settings-group__label">Updates</div>
-                <div class="settings-card">
-                  <label class="settings-item">
-                    <div class="settings-item__icon settings-item__icon--indigo">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 4 9 9"/><polyline points="15 15 20 20"/><polyline points="4 20 9 15"/><polyline points="15 9 20 4"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="3"/></svg>
-                    </div>
-                    <span class="settings-item__label">Check automatically</span>
-                    <input type="checkbox" id="toggle-auto-check-updates" class="settings-toggle" />
-                  </label>
-                  <div class="settings-divider"></div>
-                  <div class="settings-item">
-                    <div class="settings-item__icon settings-item__icon--purple">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                    </div>
-                    <span class="settings-item__label">Release channel</span>
-                    <select id="release-channel" class="settings-select">
-                      <option value="stable">Stable</option>
-                      <option value="beta">Beta</option>
-                    </select>
-                  </div>
+                <label class="settings-item">
+                  <span class="settings-item__label">Check automatically</span>
+                  <input type="checkbox" id="toggle-auto-check-updates" class="settings-toggle" />
+                </label>
+                <div class="settings-item">
+                  <span class="settings-item__label">Release channel</span>
+                  <select id="release-channel" class="settings-select">
+                    <option value="stable">Stable</option>
+                    <option value="beta">Beta</option>
+                  </select>
                 </div>
               </div>
 
               <div class="settings-group">
                 <div class="settings-group__label">Privacy &amp; Security</div>
-                <div class="settings-card">
-                  <label class="settings-item">
-                    <div class="settings-item__icon settings-item__icon--red">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                    </div>
-                    <span class="settings-item__label">Mask secrets in logs</span>
-                    <input type="checkbox" id="toggle-mask-secrets" class="settings-toggle" />
-                  </label>
-                  <div class="settings-divider"></div>
-                  <label class="settings-item">
-                    <div class="settings-item__icon settings-item__icon--yellow">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    </div>
-                    <span class="settings-item__label">macOS Keychain</span>
-                    <input type="checkbox" id="toggle-keychain-secrets" class="settings-toggle" />
-                  </label>
-                  <div class="settings-divider"></div>
-                  <label class="settings-item">
-                    <div class="settings-item__icon settings-item__icon--gray">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    </div>
-                    <span class="settings-item__label">Error logging</span>
-                    <input type="checkbox" id="toggle-error-logging" class="settings-toggle" />
-                  </label>
-                </div>
+                <label class="settings-item">
+                  <span class="settings-item__label">Mask secrets in logs</span>
+                  <input type="checkbox" id="toggle-mask-secrets" class="settings-toggle" />
+                </label>
+                <label class="settings-item">
+                  <span class="settings-item__label">macOS Keychain</span>
+                  <input type="checkbox" id="toggle-keychain-secrets" class="settings-toggle" />
+                </label>
+                <label class="settings-item">
+                  <span class="settings-item__label">Error logging</span>
+                  <input type="checkbox" id="toggle-error-logging" class="settings-toggle" />
+                </label>
               </div>
 
             </div>

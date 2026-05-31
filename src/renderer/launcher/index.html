@@ -299,22 +299,22 @@
               </label>
             </div>
 
-            <!-- Env vars + Volumes side-by-side -->
-            <div class="edit-fields-grid edit-fields-grid--top">
-              <div class="field-section">
-                <div class="field-section__header">
-                  <span>Environment Variables</span>
-                  <button class="btn btn--ghost btn--xs" id="edit-env-add-row" aria-label="Add environment variable">+ Add</button>
-                </div>
-                <div id="edit-env-table" class="kv-table"></div>
+            <!-- Env vars -->
+            <div class="field-section">
+              <div class="field-section__header">
+                <span>Environment Variables</span>
+                <button class="btn btn--ghost btn--xs" id="edit-env-add-row" aria-label="Add environment variable">+ Add</button>
               </div>
-              <div class="field-section">
-                <div class="field-section__header">
-                  <span>Volumes</span>
-                  <button class="btn btn--ghost btn--xs" id="edit-vol-add-row" aria-label="Add volume mount">+ Add</button>
-                </div>
-                <div id="edit-vol-table" class="vol-table"></div>
+              <div id="edit-env-table" class="kv-table"></div>
+            </div>
+
+            <!-- Volumes -->
+            <div class="field-section">
+              <div class="field-section__header">
+                <span>Volumes</span>
+                <button class="btn btn--ghost btn--xs" id="edit-vol-add-row" aria-label="Add volume mount">+ Add</button>
               </div>
+              <div id="edit-vol-table" class="vol-table"></div>
             </div>
           </div>
 

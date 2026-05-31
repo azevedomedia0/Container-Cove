@@ -407,10 +407,10 @@ function updateDataDirDisplays(path: string) {
   if (el) el.textContent = path;
 }
 
-function populateNetworkSelect(selectId: string, currentValue = "") {
+function populateNetworkSelect(selectId: string, currentValue = "bridge") {
   const select = document.getElementById(selectId) as HTMLSelectElement | null;
   if (!select) return;
-  const selected = currentValue || select.value || "";
+  const selected = currentValue || select.value || "bridge";
   while (select.firstChild) select.removeChild(select.firstChild);
   const defaultOpt = document.createElement("option");
   defaultOpt.value = "";
@@ -422,7 +422,7 @@ function populateNetworkSelect(selectId: string, currentValue = "") {
     opt.textContent = name;
     select.appendChild(opt);
   }
-  select.value = availableNetworks.includes(selected) ? selected : "";
+  select.value = availableNetworks.includes(selected) ? selected : "bridge";
 }
 
 function refreshNetworkSelects(addValue = "", editValue = "") {
@@ -848,7 +848,7 @@ function openEditModal(app: DockerApp) {
   (document.getElementById("edit-url") as HTMLInputElement).value = app.openUrl ?? "";
   (document.getElementById("edit-group") as HTMLInputElement).value = app.group ?? "";
   (document.getElementById("edit-restart") as HTMLSelectElement).value = app.restartPolicy ?? "no";
-  populateNetworkSelect("edit-network", app.network ?? "");
+  populateNetworkSelect("edit-network", app.network ?? "bridge");
   (document.getElementById("edit-local-domain") as HTMLInputElement).value = app.localDomain ?? "";
   buildEnvTable("edit-env-table", app.env, app.keychainEnvKeys);
   buildVolTable("edit-vol-table", app.volumes);
@@ -1264,7 +1264,7 @@ function fillAddFromRec(app: RecommendedApp) {
   (document.getElementById("add-health-timeout") as HTMLInputElement).value = "";
   (document.getElementById("add-health-retries") as HTMLInputElement).value = "";
   (document.getElementById("add-group") as HTMLInputElement).value = app.category;
-  populateNetworkSelect("add-network", "");
+  populateNetworkSelect("add-network", "bridge");
   (document.getElementById("add-local-domain") as HTMLInputElement).value = "";
   buildEnvTable("add-env-table", app.env ?? {});
   buildVolTable("add-vol-table", app.volumes ?? []);
@@ -1382,7 +1382,7 @@ function fillAddFromImage(image: DockerHubImage, display: string) {
     preset?.healthcheck?.retries?.toString() ?? "";
   (document.getElementById("add-group") as HTMLInputElement).value =
     preset?.suggestedName?.toLowerCase().includes("db") ? "databases" : "";
-  populateNetworkSelect("add-network", "");
+  populateNetworkSelect("add-network", "bridge");
   (document.getElementById("add-local-domain") as HTMLInputElement).value = "";
   buildEnvTable("add-env-table", {});
   buildVolTable("add-vol-table", []);
@@ -1432,7 +1432,7 @@ document.getElementById("btn-add")!.addEventListener("click", () => {
   switchAddTab("app");
   buildEnvTable("add-env-table", {});
   buildVolTable("add-vol-table", []);
-  populateNetworkSelect("add-network", "");
+  populateNetworkSelect("add-network", "bridge");
   (document.getElementById("add-local-domain") as HTMLInputElement).value = "";
   document.getElementById("modal-add")!.classList.remove("hidden");
   requestNetworksList();

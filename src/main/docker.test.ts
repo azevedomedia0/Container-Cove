@@ -39,7 +39,7 @@ describe("docker args", () => {
     const args = buildDockerRunArgs(app);
     expect(args[0]).toBe("docker");
     expect(args).toContain("--name");
-    expect(args).toContain("loading-dock-postgres-dev");
+    expect(args).toContain("container-cove-postgres-dev");
     expect(args).toContain("-p");
     expect(args).toContain("5432:5432");
     expect(args).toContain("-e");

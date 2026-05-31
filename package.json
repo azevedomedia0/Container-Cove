@@ -1,7 +1,7 @@
 {
-  "name": "loading-dock",
+  "name": "container-cove",
   "version": "1.2.0",
-  "description": "Docker apps as desktop icons",
+  "description": "Run containers as desktop apps",
   "license": "MIT",
   "scripts": {
     "start": "bunx electrobun dev",

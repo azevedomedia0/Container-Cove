@@ -114,6 +114,10 @@ export function buildHubCardHTML(
   const badge = image.isOfficial
     ? `<span class="hub-card__badge">Official</span>`
     : "";
+  // Construct Docker Hub URL based on whether it's an official image
+  const dockerHubUrl = image.isOfficial
+    ? `https://hub.docker.com/_/${image.name}`
+    : `https://hub.docker.com/r/${image.name}`;
   return (
     `<div class="hub-card__header">` +
       `<div class="hub-card__icon">` +
@@ -131,6 +135,6 @@ export function buildHubCardHTML(
       `</div>` +
     `</div>` +
     `<div class="hub-card__desc">${(image.description || "No description").slice(0, 120)}</div>` +
-    `<div class="hub-actions"><button class="btn btn--ghost" data-action="details">Details</button><button class="btn btn--primary" data-action="install">Install</button></div>`
+    `<div class="hub-actions"><a href="${dockerHubUrl}" target="_blank" class="btn btn--ghost">Details</a><button class="btn btn--primary" data-action="install">Install</button></div>`
   );
 }

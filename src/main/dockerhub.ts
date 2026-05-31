@@ -28,7 +28,7 @@ export async function fetchOgImage(image: string): Promise<string | null> {
   if (!pageUrl) return null;
   try {
     const res = await fetch(pageUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; The Loading Dock(r)/1.0)" },
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Container Cove/1.0)" },
     });
     if (!res.ok) return null;
     const html = await res.text();

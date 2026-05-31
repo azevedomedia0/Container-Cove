@@ -289,7 +289,7 @@ export async function launchApp(
     onStatus(app.id, "error");
     onLog(
       app.id,
-      "[loading-dock] Podman not found. Install Podman (podman.io) or set PODMAN_PATH.",
+      "[container-cove] Podman not found. Install Podman (podman.io) or set PODMAN_PATH.",
     );
     return;
   }
@@ -327,11 +327,11 @@ export async function launchApp(
     proc.exited.then((code) => {
       activeProcs.delete(app.id);
       onStatus(app.id, code === 0 ? "stopped" : "error");
-      onLog(app.id, "[loading-dock] Container exited with code " + code);
+      onLog(app.id, "[container-cove] Container exited with code " + code);
     });
   } catch (err) {
     onStatus(app.id, "error");
-    onLog(app.id, "[loading-dock] Failed to start: " + String(err));
+    onLog(app.id, "[container-cove] Failed to start: " + String(err));
   }
 }
 
@@ -351,7 +351,7 @@ export async function stopApp(
 }
 
 export function containerName(app: DockerApp): string {
-  return "loading-dock-" + app.id;
+  return "container-cove-" + app.id;
 }
 
 export function buildDockerRunArgs(
@@ -458,7 +458,7 @@ export function parseHealthBatchOutput(
   const lines = text.trim().split("\n").filter(Boolean);
 
   for (const app of apps) {
-    // docker inspect's {{.Name}} carries a leading "/" — e.g. "/loading-dock-foo"
+    // docker inspect's {{.Name}} carries a leading "/" — e.g. "/container-cove-foo"
     const needle = "/" + containerName(app) + "|";
     const line = lines.find((l) => l.startsWith(needle));
     const raw = line?.split("|")[1]?.trim() ?? "";

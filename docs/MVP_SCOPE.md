@@ -1,6 +1,6 @@
-# The Loading Dock(r) — Scope & Feature History
+# Container Cove — Scope & Feature History
 
-> Previously named **ElectroDocker**. Renamed to **The Loading Dock(r)** in v1.1.
+> Previously named **ElectroDocker**. Renamed to **Container Cove** in v1.1.
 
 ## Project Goal
 
@@ -41,7 +41,7 @@ Shipped beyond the original MVP scope:
 
 Full visual redesign:
 
-- Renamed app to **The Loading Dock(r)**; updated all identifiers to `loading-dock`
+- Renamed app to **Container Cove**; updated all identifiers to `loading-dock`
 - Cal Sans title font via Bunny Fonts CDN
 - Custom app icon (whale + house) in topbar
 - Custom Iconoir SVG buttons in toolbar (check updates, pull, push, add app)
@@ -68,7 +68,7 @@ Full visual redesign:
 - **One-click topbar update chip** — replaces update banner with inline progress bar
 - **Desktop shortcut icons** — `.app` bundles created on `~/Desktop` on install, icons fetched from CDN and converted to ICNS via `sips`
 - **Tray menu** — live per-app colored dots (🟢/🟡/🔴), click-to-launch, Stop All / Restart All
-- **Default env vars and volumes** for all 26 recommended apps (data persisted under `~/.loading-dock/`)
+- **Default env vars and volumes** for all 26 recommended apps (data persisted under `~/.container-cove/`)
 - New recommended apps: Navidrome, Homebridge, Puter, Guacamole
 - Tailscale moved to Self-hosted Essentials; all images pinned to `:latest`
 - Registry loader hardened: missing `env`/`volumes`/`ports` in older `apps.json` default to safe empty values

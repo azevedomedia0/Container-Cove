@@ -66,9 +66,9 @@ const TRAY_ICON_B64 =
   "op1EdICI7lPVnngmWE5sFgG8o6p/Msb8emRk5GJ6rLvV4fS/f+7q6mpzzn1ERD5MRNvi6qdENKGqF0TkXK1W" +
   "e2fJf9c1nP4HWCA+QSNCyegAAAAASUVORK5CYII=";
 
-const TRAY_ICON_PATH = join(tmpdir(), "loading-dock-tray.png");
+const TRAY_ICON_PATH = join(tmpdir(), "container-cove-tray.png");
 writeFileSync(TRAY_ICON_PATH, Buffer.from(TRAY_ICON_B64, "base64"));
-const WINDOWS_TOAST_SCRIPT_PATH = join(tmpdir(), "loading-dock-toast.ps1");
+const WINDOWS_TOAST_SCRIPT_PATH = join(tmpdir(), "container-cove-toast.ps1");
 writeFileSync(
   WINDOWS_TOAST_SCRIPT_PATH,
   `
@@ -84,7 +84,7 @@ $Body = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64Strin
 $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
 $template.GetElementsByTagName('text')[0].AppendChild($template.CreateTextNode($Title)) | Out-Null
 $template.GetElementsByTagName('text')[1].AppendChild($template.CreateTextNode($Body)) | Out-Null
-$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('The Loading Dock(r)')
+$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Container Cove')
 $notifier.Show([Windows.UI.Notifications.ToastNotification]::new($template))
   `.trim(),
 );
@@ -167,7 +167,7 @@ const state: AppState = {
   autoCheckUpdates: true,
   theme: "dark",
   showOnboarding: true,
-  dataDir: "~/.loading-dock",
+  dataDir: "~/.container-cove",
   releaseChannel: "stable",
   pendingUpdate: null,
   pendingWebUiOpen: new Set(),
@@ -203,10 +203,10 @@ function broadcast(message: IpcMessage) {
     const app = state.apps.find((a) => a.id === message.id);
     const name = app?.name ?? message.id;
     if (message.status === "error") {
-      sendNativeNotification("The Loading Dock(r)", `${name} entered an error state.`);
+      sendNativeNotification("Container Cove", `${name} entered an error state.`);
       broadcast({ type: "error", message: `App ${name} entered error state.` });
     } else if (message.status === "stopped" && app?.status !== "stopping") {
-      sendNativeNotification("The Loading Dock(r)", `${name} stopped unexpectedly.`);
+      sendNativeNotification("Container Cove", `${name} stopped unexpectedly.`);
     }
   }
   sendToLauncher(message);
@@ -356,7 +356,7 @@ function createSetupWindow(): Promise<void> {
     } as any);
 
     // FIX 9: Add logging when setup window created
-    console.log("[loading-dock] Setup wizard window created.");
+    console.log("[container-cove] Setup wizard window created.");
 
     const rpc = (setupWindow as any).rpc;
 
@@ -488,7 +488,7 @@ function openLauncher() {
   if (launcherWindow) { launcherWindow.show(); return; }
   launcherReady = false;
   launcherWindow = new BrowserWindow({
-    title: "The Loading Dock(r)",
+    title: "Container Cove",
     url: "views://launcher/index.html",
     frame: windowBounds,
   } as any);
@@ -604,7 +604,7 @@ async function restartAppForHealth(app: DockerApp) {
       `Restarting ${app.name} after repeated unhealthy health checks`,
       app.id,
     );
-    sendNativeNotification("The Loading Dock(r)", `${app.name} was unhealthy — restarting container`);
+    sendNativeNotification("Container Cove", `${app.name} was unhealthy — restarting container`);
     await stopApp(app, (id, status) => {
       const t = state.apps.find((a) => a.id === id);
       if (t) t.status = status;
@@ -640,7 +640,7 @@ async function checkAndRunSetup(): Promise<boolean> {
   const runtimeAvailable = await isDockerAvailable();
 
   if (!runtimeAvailable && !setupStarted) {
-    console.log("[loading-dock] Podman/Docker not available — launching setup wizard…");
+    console.log("[container-cove] Podman/Docker not available — launching setup wizard…");
     await createSetupWindow();
     // After setup completes or is cancelled, check again
     return await isDockerAvailable();
@@ -678,7 +678,7 @@ async function main() {
   state.autoCheckUpdates = settings.autoCheckUpdates ?? true;
   state.theme = settings.theme ?? "dark";
   state.showOnboarding = settings.showOnboarding ?? true;
-  state.dataDir = settings.dataDir ?? "~/.loading-dock";
+  state.dataDir = settings.dataDir ?? "~/.container-cove";
   if (settings.windowBounds) windowBounds = settings.windowBounds;
 
   dockerAvailable = await isDockerAvailable();
@@ -692,7 +692,7 @@ async function main() {
   const runtimeReady = await checkAndRunSetup();
 
   if (!runtimeReady && !setupStarted) {
-    console.error("[loading-dock] Podman/Docker not available after setup attempt. Exiting.");
+    console.error("[container-cove] Podman/Docker not available after setup attempt. Exiting.");
     process.exit(1);
   }
 
@@ -711,7 +711,7 @@ async function main() {
 async function autoLaunchAllApps() {
   const appsToRestore = state.apps.filter((app) => startupRestoreIds.has(app.id));
   if (appsToRestore.length === 0) return;
-  console.log(`[loading-dock] Restoring ${appsToRestore.length} running app(s)…`);
+  console.log(`[container-cove] Restoring ${appsToRestore.length} running app(s)…`);
   await Promise.allSettled(
     appsToRestore.map((app) => handleIpc({ type: "app:launch", id: app.id })),
   );
@@ -732,10 +732,10 @@ async function ensureDockerRunning() {
     if (ready) {
       dockerAvailable = true;
       sendToLauncher({ type: "docker:availability", available: true, canRetry: false });
-      console.log("[loading-dock] Podman is ready.");
+      console.log("[container-cove] Podman is ready.");
       void autoLaunchAllApps();
     } else {
-      console.error("[loading-dock] Podman did not become ready within the timeout.");
+      console.error("[container-cove] Podman did not become ready within the timeout.");
       sendToLauncher({
         type: "docker:availability",
         available: false,
@@ -911,9 +911,9 @@ function startLocalDomainProxy() {
         }
       },
     });
-    console.log(`[loading-dock] Local domain proxy on port ${LOCAL_PROXY_PORT}`);
+    console.log(`[container-cove] Local domain proxy on port ${LOCAL_PROXY_PORT}`);
   } catch (err) {
-    console.error("[loading-dock] Could not start local domain proxy:", err);
+    console.error("[container-cove] Could not start local domain proxy:", err);
   }
 }
 
@@ -1053,9 +1053,9 @@ function handleTrayAction(event: unknown) {
 function setupMenu() {
   ApplicationMenu.setApplicationMenu([
     {
-      label: "The Loading Dock(r)",
+      label: "Container Cove",
       submenu: [
-        { label: "About The Loading Dock(r)", role: "about" },
+        { label: "About Container Cove", role: "about" },
         { type: "separator" },
         { label: "Quit", role: "quit-app" },
       ],

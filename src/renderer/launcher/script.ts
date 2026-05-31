@@ -75,7 +75,7 @@ let searchDebounce: ReturnType<typeof setTimeout> | null = null;
 const pendingWebUiOpen = new Set<string>();
 
 // Current app data directory (set from settings, used for volume path substitution)
-let dataDir = "~/.loading-dock";
+let dataDir = "~/.container-cove";
 // System identity values — received from main once on startup
 let systemUid = "1000";
 let systemGid = "1000";
@@ -137,11 +137,11 @@ function startRecInstall(app: RecommendedApp, button: HTMLButtonElement) {
       iconUrl: app.iconUrl,
       ports: app.ports ?? [],
       volumes: (app.volumes ?? []).map((v) =>
-        v.replace("~/.loading-dock", dataDir),
+        v.replace("~/.container-cove", dataDir),
       ),
       env: Object.fromEntries(
         Object.entries(app.env ?? {}).map(([k, v]) => {
-          let val = v.replace("~/.loading-dock", dataDir);
+          let val = v.replace("~/.container-cove", dataDir);
           if (k === "PUID") val = systemUid;
           else if (k === "PGID") val = systemGid;
           else if (k === "UID") val = systemUid;
@@ -186,105 +186,105 @@ const RECOMMENDED_APPS: RecommendedApp[] = [
   // Admin credentials pre-set so the UI is accessible immediately on first launch.
   { category: "Self-hosted Essentials", name: "Nextcloud", image: "nextcloud:latest", icon: "☁️", iconSlug: "nextcloud", iconUrl: "https://images.icon-icons.com/2108/PNG/512/nextcloud_icon_130873.png", description: "File hosting, calendar, contacts, and full collaboration suite. Default login: admin / changeme.", ports: ["8080:80"], openUrl: "http://localhost:8080", restartPolicy: "unless-stopped",
     env: { NEXTCLOUD_ADMIN_USER: "admin", NEXTCLOUD_ADMIN_PASSWORD: "changeme" },
-    volumes: ["~/.loading-dock/nextcloud:/var/www/html"] },
+    volumes: ["~/.container-cove/nextcloud:/var/www/html"] },
 
   // WordPress: requires a MySQL/MariaDB database — add your DB connection details before launching.
   { category: "Self-hosted Essentials", name: "WordPress", image: "wordpress:latest", icon: "📝", iconSlug: "wordpress", description: "The world's most popular CMS. Requires a MySQL or MariaDB database — set the DB env vars to connect.", ports: ["8082:80"], openUrl: "http://localhost:8082", restartPolicy: "unless-stopped",
     env: { WORDPRESS_DB_HOST: "", WORDPRESS_DB_USER: "wordpress", WORDPRESS_DB_PASSWORD: "", WORDPRESS_DB_NAME: "wordpress" },
-    volumes: ["~/.loading-dock/wordpress:/var/www/html"] },
+    volumes: ["~/.container-cove/wordpress:/var/www/html"] },
 
 { category: "Self-hosted Essentials", name: "Puter", image: "ghcr.io/heyputer/puter:latest", icon: "🖥️", iconSlug: "puter", description: "Self-hosted cloud desktop — files, apps, and AI in your browser.", ports: ["4100:4100"], openUrl: "http://localhost:4100", restartPolicy: "unless-stopped",
-    volumes: ["~/.loading-dock/puter/config:/root/.config/puter"] },
+    volumes: ["~/.container-cove/puter/config:/root/.config/puter"] },
 
   // Tailscale: userspace mode avoids the /dev/net/tun bind-mount and NET_ADMIN cap requirement
   // so it starts cleanly inside Docker Desktop on macOS. Paste your auth key to connect.
   { category: "Self-hosted Essentials", name: "Tailscale", image: "tailscale/tailscale:latest", icon: "🔐", iconSlug: "tailscale", iconUrl: "https://tailscale.com/favicon.png", description: "Mesh VPN for secure private networking. Paste your auth key into TS_AUTHKEY, then restart to connect.", ports: [], restartPolicy: "unless-stopped",
     env: { TS_AUTHKEY: "", TS_USERSPACE: "1", TS_STATE_DIR: "/var/lib/tailscale" },
-    volumes: ["~/.loading-dock/tailscale/state:/var/lib/tailscale"] },
+    volumes: ["~/.container-cove/tailscale/state:/var/lib/tailscale"] },
 
   // Photo Libraries
   { category: "Photo Libraries", name: "Immich", image: "ghcr.io/immich-app/immich-server:release", icon: "📸", iconSlug: "immich", description: "Self-hosted photo and video backup with AI-powered search and face recognition. Requires a PostgreSQL database and Redis — start those first or use Compose.", ports: ["2283:3001"], openUrl: "http://localhost:2283", restartPolicy: "unless-stopped",
     env: { DB_HOSTNAME: "host.docker.internal", DB_USERNAME: "postgres", DB_PASSWORD: "postgres", DB_DATABASE_NAME: "immich", REDIS_HOSTNAME: "host.docker.internal" },
-    volumes: ["~/.loading-dock/immich/upload:/usr/src/app/upload", "~/Pictures:/usr/src/app/upload/library"] },
+    volumes: ["~/.container-cove/immich/upload:/usr/src/app/upload", "~/Pictures:/usr/src/app/upload/library"] },
 
   { category: "Photo Libraries", name: "PhotoPrism", image: "photoprism/photoprism:latest", icon: "🖼️", iconSlug: "photoprism", description: "AI-powered photo management with face recognition and geo-tagging. Default login: admin / changeme.", ports: ["2342:2342"], openUrl: "http://localhost:2342", restartPolicy: "unless-stopped",
     env: { PHOTOPRISM_AUTH_MODE: "password", PHOTOPRISM_ADMIN_USER: "admin", PHOTOPRISM_ADMIN_PASSWORD: "changeme", PHOTOPRISM_HTTP_COMPRESSION: "gzip", PHOTOPRISM_DATABASE_DRIVER: "sqlite" },
-    volumes: ["~/.loading-dock/photoprism/storage:/photoprism/storage", "~/Pictures:/photoprism/originals"] },
+    volumes: ["~/.container-cove/photoprism/storage:/photoprism/storage", "~/Pictures:/photoprism/originals"] },
 
   // Media Servers
   { category: "Media Servers", name: "Plex", image: "lscr.io/linuxserver/plex:latest", icon: "🎬", iconSlug: "plex", description: "Powerful media server for movies, TV, music, and photos.", ports: ["32400:32400"], openUrl: "http://localhost:32400/web", restartPolicy: "unless-stopped",
     env: { PUID: "1000", PGID: "1000", TZ: "UTC", VERSION: "docker", PLEX_CLAIM: "" },
-    volumes: ["~/.loading-dock/plex/config:/config", "~/Movies:/movies", "~/Music:/music", "~/TV:/tv"] },
+    volumes: ["~/.container-cove/plex/config:/config", "~/Movies:/movies", "~/Music:/music", "~/TV:/tv"] },
 
   { category: "Media Servers", name: "Jellyfin", image: "jellyfin/jellyfin:latest", icon: "🎞️", iconSlug: "jellyfin", description: "Free open-source media system — no subscriptions, no tracking.", ports: ["8096:8096"], openUrl: "http://localhost:8096", restartPolicy: "unless-stopped",
     env: { TZ: "UTC" },
-    volumes: ["~/.loading-dock/jellyfin/config:/config", "~/.loading-dock/jellyfin/cache:/cache", "~/Movies:/movies", "~/Music:/music", "~/TV:/tv"] },
+    volumes: ["~/.container-cove/jellyfin/config:/config", "~/.container-cove/jellyfin/cache:/cache", "~/Movies:/movies", "~/Music:/music", "~/TV:/tv"] },
 
   // Emby uses host port 8097 to avoid collision with Jellyfin on 8096.
   { category: "Media Servers", name: "Emby", image: "emby/embyserver:latest", icon: "📺", iconSlug: "emby", description: "Personal media server — organise and stream your movies, TV, and music to any device.", ports: ["8097:8096", "8920:8920"], openUrl: "http://localhost:8097/web", restartPolicy: "unless-stopped",
     env: { UID: "1000", GID: "1000" },
-    volumes: ["~/.loading-dock/emby/config:/config", "~/Movies:/mnt/movies", "~/Music:/mnt/music", "~/TV:/mnt/tv"] },
+    volumes: ["~/.container-cove/emby/config:/config", "~/Movies:/mnt/movies", "~/Music:/mnt/music", "~/TV:/mnt/tv"] },
 
   { category: "Media Servers", name: "Navidrome", image: "deluan/navidrome:latest", icon: "🎵", iconSlug: "navidrome", description: "Modern self-hosted music server and streamer, compatible with Subsonic clients.", ports: ["4533:4533"], openUrl: "http://localhost:4533", restartPolicy: "unless-stopped",
     env: { ND_MUSICFOLDER: "/music", ND_DATAFOLDER: "/data", ND_LOGLEVEL: "info" },
-    volumes: ["~/.loading-dock/navidrome/data:/data", "~/Music:/music:ro"] },
+    volumes: ["~/.container-cove/navidrome/data:/data", "~/Music:/music:ro"] },
 
   // AI & Automation
   { category: "AI & Automation", name: "Ollama", image: "ollama/ollama:latest", icon: "🤖", iconSlug: "ollama", description: "Run large language models locally with a simple REST API.", ports: ["11434:11434"], restartPolicy: "unless-stopped",
-    volumes: ["~/.loading-dock/ollama:/root/.ollama"] },
+    volumes: ["~/.container-cove/ollama:/root/.ollama"] },
 
   { category: "AI & Automation", name: "n8n", image: "n8nio/n8n:latest", icon: "⚙️", iconSlug: "n8n", description: "Workflow automation with 400+ integrations and a visual node editor.", ports: ["5678:5678"], openUrl: "http://localhost:5678", restartPolicy: "unless-stopped",
     env: { N8N_BASIC_AUTH_ACTIVE: "false", N8N_PORT: "5678" },
-    volumes: ["~/.loading-dock/n8n:/home/node/.n8n"] },
+    volumes: ["~/.container-cove/n8n:/home/node/.n8n"] },
 
   // Open WebUI: chat UI for local LLMs — connects to Ollama automatically.
   // host.docker.internal resolves to the host on both Podman (macOS machine / Linux ≥4) and Docker.
   { category: "AI & Automation", name: "Open WebUI", image: "ghcr.io/open-webui/open-webui:main", icon: "💬", iconSlug: "open-webui", description: "Feature-rich chat UI for Ollama and OpenAI-compatible APIs. Auto-connects to a local Ollama instance.", ports: ["3000:8080"], openUrl: "http://localhost:3000", restartPolicy: "unless-stopped",
     env: { OLLAMA_BASE_URL: "http://host.docker.internal:11434", WEBUI_AUTH: "false" },
-    volumes: ["~/.loading-dock/open-webui:/app/backend/data"] },
+    volumes: ["~/.container-cove/open-webui:/app/backend/data"] },
 
   { category: "AI & Automation", name: "Hermes Chat", image: "ghcr.io/hermeschat/hermes:latest", icon: "💬", iconSlug: "hermes-icon", description: "Self-hosted team chat and messaging platform.", ports: ["3000:3000"], openUrl: "http://localhost:3000", restartPolicy: "unless-stopped",
-    volumes: ["~/.loading-dock/hermes/data:/app/data"] },
+    volumes: ["~/.container-cove/hermes/data:/app/data"] },
 
   // Media Management
   { category: "Media Management", name: "Radarr", image: "lscr.io/linuxserver/radarr:latest", icon: "🎥", iconSlug: "radarr", description: "Movie collection manager with automated downloading and organisation.", ports: ["7878:7878"], openUrl: "http://localhost:7878", restartPolicy: "unless-stopped",
     env: { PUID: "1000", PGID: "1000", TZ: "UTC" },
-    volumes: ["~/.loading-dock/radarr/config:/config", "~/Movies:/movies", "~/Downloads:/downloads"] },
+    volumes: ["~/.container-cove/radarr/config:/config", "~/Movies:/movies", "~/Downloads:/downloads"] },
 
   { category: "Media Management", name: "Sonarr", image: "lscr.io/linuxserver/sonarr:latest", icon: "📺", iconSlug: "sonarr", description: "TV series manager with automatic episode monitoring and downloading.", ports: ["8989:8989"], openUrl: "http://localhost:8989", restartPolicy: "unless-stopped",
     env: { PUID: "1000", PGID: "1000", TZ: "UTC" },
-    volumes: ["~/.loading-dock/sonarr/config:/config", "~/TV:/tv", "~/Downloads:/downloads"] },
+    volumes: ["~/.container-cove/sonarr/config:/config", "~/TV:/tv", "~/Downloads:/downloads"] },
 
   { category: "Media Management", name: "Bazarr", image: "lscr.io/linuxserver/bazarr:latest", icon: "🗣️", iconSlug: "bazarr", description: "Subtitle manager that integrates with Radarr and Sonarr.", ports: ["6767:6767"], openUrl: "http://localhost:6767", restartPolicy: "unless-stopped",
     env: { PUID: "1000", PGID: "1000", TZ: "UTC" },
-    volumes: ["~/.loading-dock/bazarr/config:/config", "~/Movies:/movies", "~/TV:/tv"] },
+    volumes: ["~/.container-cove/bazarr/config:/config", "~/Movies:/movies", "~/TV:/tv"] },
 
   { category: "Media Management", name: "Lidarr", image: "lscr.io/linuxserver/lidarr:latest", icon: "🎵", iconSlug: "lidarr", description: "Music collection manager with automated album downloading.", ports: ["8686:8686"], openUrl: "http://localhost:8686", restartPolicy: "unless-stopped",
     env: { PUID: "1000", PGID: "1000", TZ: "UTC" },
-    volumes: ["~/.loading-dock/lidarr/config:/config", "~/Music:/music", "~/Downloads:/downloads"] },
+    volumes: ["~/.container-cove/lidarr/config:/config", "~/Music:/music", "~/Downloads:/downloads"] },
 
   // qBittorrent: WEBUI_PORT must match the container-side of the port mapping (8080), not the host port.
   { category: "Media Management", name: "qBittorrent", image: "lscr.io/linuxserver/qbittorrent:latest", icon: "⬇️", iconSlug: "qbittorrent", description: "Feature-rich torrent client with a web-based management UI. Default login: admin / adminadmin.", ports: ["8090:8080", "6881:6881"], openUrl: "http://localhost:8090", restartPolicy: "unless-stopped",
     env: { PUID: "1000", PGID: "1000", TZ: "UTC", WEBUI_PORT: "8080" },
-    volumes: ["~/.loading-dock/qbittorrent/config:/config", "~/Downloads:/downloads"] },
+    volumes: ["~/.container-cove/qbittorrent/config:/config", "~/Downloads:/downloads"] },
 
   // Calibre-Web: DOCKER_MODS removed — the Calibre mod triggers a multi-minute install on first boot.
   { category: "Media Management", name: "Calibre-Web", image: "lscr.io/linuxserver/calibre-web:latest", icon: "📚", iconSlug: "calibre-web", description: "Web-based eBook manager and reader. Point it at an existing Calibre library folder on first launch.", ports: ["8083:8083"], openUrl: "http://localhost:8083", restartPolicy: "unless-stopped",
     env: { PUID: "1000", PGID: "1000", TZ: "UTC" },
-    volumes: ["~/.loading-dock/calibre-web/config:/config", "~/Books:/books"] },
+    volumes: ["~/.container-cove/calibre-web/config:/config", "~/Books:/books"] },
 
   // Smart Home & Network
   { category: "Smart Home & Network", name: "Home Assistant", image: "ghcr.io/home-assistant/home-assistant:latest", icon: "🏠", iconSlug: "home-assistant", description: "Open source home automation platform for smart home control.", ports: ["8123:8123"], openUrl: "http://localhost:8123", restartPolicy: "unless-stopped",
     env: { TZ: "UTC" },
-    volumes: ["~/.loading-dock/home-assistant/config:/config"] },
+    volumes: ["~/.container-cove/home-assistant/config:/config"] },
 
   // Pi-hole: port 53 is reserved by macOS mDNSResponder, so DNS is exposed on host port 5353.
   { category: "Smart Home & Network", name: "Pi-hole", image: "pihole/pihole:latest", icon: "🛡️", iconSlug: "pi-hole", description: "Network-wide ad and tracker blocking via DNS sinkhole. Admin password: changeme. DNS available on port 5353.", ports: ["8053:80", "5353:53/tcp", "5353:53/udp"], openUrl: "http://localhost:8053/admin", restartPolicy: "unless-stopped",
     env: { TZ: "UTC", WEBPASSWORD: "changeme" },
-    volumes: ["~/.loading-dock/pihole/etc-pihole:/etc/pihole", "~/.loading-dock/pihole/etc-dnsmasq.d:/etc/dnsmasq.d"] },
+    volumes: ["~/.container-cove/pihole/etc-pihole:/etc/pihole", "~/.container-cove/pihole/etc-dnsmasq.d:/etc/dnsmasq.d"] },
 
   { category: "Smart Home & Network", name: "Nginx Proxy Manager", image: "jc21/nginx-proxy-manager:latest", icon: "🔀", iconSlug: "nginx-proxy-manager", description: "Reverse proxy with a web UI for hosts, SSL (Let's Encrypt), and access lists. Default login: admin@example.com / changeme.", ports: ["8181:81", "8880:80", "4443:443"], openUrl: "http://localhost:8181", restartPolicy: "unless-stopped",
-    volumes: ["~/.loading-dock/nginx-proxy-manager/data:/data", "~/.loading-dock/nginx-proxy-manager/letsencrypt:/etc/letsencrypt"] },
+    volumes: ["~/.container-cove/nginx-proxy-manager/data:/data", "~/.container-cove/nginx-proxy-manager/letsencrypt:/etc/letsencrypt"] },
 
   // Cloudflare DDNS: correct env var is CF_API_TOKEN (not CLOUDFLARE_API_TOKEN).
   { category: "Smart Home & Network", name: "Cloudflare DDNS", image: "favonia/cloudflare-ddns:latest", icon: "☁️", iconSlug: "cloudflare", description: "Keeps your Cloudflare DNS records in sync when your public IP changes. Add your API token and domain to activate.", ports: [], restartPolicy: "unless-stopped",
@@ -292,11 +292,11 @@ const RECOMMENDED_APPS: RecommendedApp[] = [
 
   { category: "Smart Home & Network", name: "Homebridge", image: "homebridge/homebridge:latest", icon: "🏡", iconSlug: "homebridge", description: "Bridge non-HomeKit smart home devices to Apple HomeKit via a lightweight Node.js server.", ports: ["8581:8581"], openUrl: "http://localhost:8581", restartPolicy: "unless-stopped",
     env: { TZ: "UTC", HOMEBRIDGE_CONFIG_UI: "1", HOMEBRIDGE_CONFIG_UI_PORT: "8581" },
-    volumes: ["~/.loading-dock/homebridge/config:/homebridge"] },
+    volumes: ["~/.container-cove/homebridge/config:/homebridge"] },
 
   { category: "Smart Home & Network", name: "Syncthing", image: "syncthing/syncthing:latest", icon: "🔄", iconSlug: "syncthing", description: "Continuous file synchronisation — securely sync files between devices without a central server.", ports: ["8384:8384", "22000:22000"], openUrl: "http://localhost:8384", restartPolicy: "unless-stopped",
     env: { PUID: "1000", PGID: "1000" },
-    volumes: ["~/.loading-dock/syncthing/config:/var/syncthing/config", "~/Sync:/var/syncthing/data"] },
+    volumes: ["~/.container-cove/syncthing/config:/var/syncthing/config", "~/Sync:/var/syncthing/data"] },
 ];
 
 function send(msg: IpcMessage) {
@@ -395,7 +395,7 @@ function updateOnboardingPodmanCopy(isFirstRun: boolean) {
   if (!strong || !small) return;
   if (isFirstRun) {
     strong.textContent = "Install Podman first";
-    small.textContent = "The Loading Dock(r) uses Podman to run your apps. Open the install guide, install Podman, then come back and click Retry.";
+    small.textContent = "Container Cove uses Podman to run your apps. Open the install guide, install Podman, then come back and click Retry.";
   } else {
     strong.textContent = "Podman is not responding";
     small.textContent = "Podman was working before but is no longer available. Click Retry to restart it, or open the install guide if it has been uninstalled.";
@@ -1075,7 +1075,7 @@ ev.on("ipc-message", (msg: IpcMessage) => {
       const href = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = href;
-      a.download = "loading-dock-apps.json";
+      a.download = "container-cove-apps.json";
       a.click();
       URL.revokeObjectURL(href);
       break;
@@ -1127,7 +1127,7 @@ ev.on("ipc-message", (msg: IpcMessage) => {
       const href = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = href;
-      a.download = "loading-dock-errors.json";
+      a.download = "container-cove-errors.json";
       a.click();
       URL.revokeObjectURL(href);
       break;
@@ -1399,9 +1399,7 @@ function buildHubCard(image: DockerHubImage, closeModal: boolean): HTMLElement {
   card.className = "hub-card";
   const display = image.isOfficial ? image.name : image.fullName;
   card.innerHTML = buildHubCardHTML(image, display);
-  card.querySelector("[data-action='details']")?.addEventListener("click", () =>
-    renderHubMeta(image, display),
-  );
+  // Details button is now a direct link to Docker Hub (opens in new tab)
   card.querySelector("[data-action='install']")?.addEventListener("click", () => {
     fillAddFromImage(image, display);
     if (closeModal) document.getElementById("modal-hub")!.classList.add("hidden");

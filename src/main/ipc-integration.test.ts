@@ -33,7 +33,7 @@ describe("settings IPC contract", () => {
       secretsMaskingEnabled: true,
       keychainSecretsEnabled: false,
       showOnboarding: true,
-      dataDir: "~/.loading-dock",
+      dataDir: "~/.container-cove",
       systemUid: "1000",
       systemGid: "1000",
       systemTz: "UTC",

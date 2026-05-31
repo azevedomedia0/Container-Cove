@@ -23,7 +23,7 @@ export async function handleSettings(
       await saveSettings({ keychainSecretsEnabled: state.keychainSecretsEnabled });
       broadcast({
         type: "notification:show",
-        title: "The Loading Dock(r)",
+        title: "Container Cove",
         body: `Keychain secrets ${state.keychainSecretsEnabled ? "enabled" : "disabled"}.`,
       });
       return true;

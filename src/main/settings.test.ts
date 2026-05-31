@@ -7,14 +7,14 @@ import { getSettingsFile, loadSettings, saveSettings } from "./settings";
 describe("settings paths", () => {
   test("uses platform-specific config dir", () => {
     expect(getSettingsFile("darwin", { HOME: "/Users/test" })).toBe(
-      "/Users/test/Library/Application Support/loading-dock/settings.json",
+      "/Users/test/Library/Application Support/container-cove/settings.json",
     );
     expect(getSettingsFile("linux", { HOME: "/home/test" })).toBe(
-      "/home/test/.config/loading-dock/settings.json",
+      "/home/test/.config/container-cove/settings.json",
     );
     expect(
       getSettingsFile("win32", { APPDATA: "C:/Users/test/AppData/Roaming" }),
-    ).toBe("C:/Users/test/AppData/Roaming/loading-dock/settings.json");
+    ).toBe("C:/Users/test/AppData/Roaming/container-cove/settings.json");
   });
 });
 

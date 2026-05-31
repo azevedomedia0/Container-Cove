@@ -31,7 +31,7 @@ import { LAUNCH_SERVER_PORT } from "../constants";
 import type { HandlerContext } from "./context";
 import { tmpdir } from "os";
 
-const DESKTOP_ICON_PLACEHOLDER_ICNS = join(tmpdir(), "loading-dock-shortcut-placeholder.icns");
+const DESKTOP_ICON_PLACEHOLDER_ICNS = join(tmpdir(), "container-cove-shortcut-placeholder.icns");
 const DESKTOP_ICONSET_CANDIDATES = [
   join(process.cwd(), "assets/icons/App_Icon.iconset"),
   join(dirname(process.execPath), "..", "..", "assets/icons/App_Icon.iconset"),
@@ -455,7 +455,7 @@ void ensureDesktopIconPlaceholder();
 async function fetchDesktopIconArtwork(app: DockerApp): Promise<string | null> {
   const slug = app.iconSlug || iconSlugForApp(app.image);
   const iconUrl = app.iconUrl || `https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons@main/png/${slug}.png`;
-  const workDir = join(tmpdir(), `loading-dock-icon-${app.id}`);
+  const workDir = join(tmpdir(), `container-cove-icon-${app.id}`);
   const iconPng = join(workDir, "icon.png");
   const iconsetDir = join(workDir, "icon.iconset");
   const generatedIcns = join(workDir, "icon.generated.icns");
@@ -552,7 +552,7 @@ export async function createDesktopIcon(
     const script = join(macosDir, "launch");
     writeFileSync(
       script,
-      `#!/bin/bash\ncurl -s "http://localhost:${LAUNCH_SERVER_PORT}/launch?id=${app.id}" &\nopen -a "The Loading Dock(r)"\n`,
+      `#!/bin/bash\ncurl -s "http://localhost:${LAUNCH_SERVER_PORT}/launch?id=${app.id}" &\nopen -a "Container Cove"\n`,
     );
     chmodSync(script, 0o755);
   } catch (err) {

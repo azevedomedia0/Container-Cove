@@ -39,7 +39,7 @@ const DEFAULTS: AppSettings = {
   autoCheckUpdates: true,
   theme: "dark",
   showOnboarding: true,
-  dataDir: "~/.loading-dock",
+  dataDir: "~/.container-cove",
 };
 
 export function getSettingsFile(

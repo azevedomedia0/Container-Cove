@@ -54,7 +54,7 @@ async function fetchLatestRelease(
   const res = await fetch(url, {
     headers: {
       Accept: "application/vnd.github+json",
-      "User-Agent": "loading-dock-updater",
+      "User-Agent": "container-cove-updater",
     },
     signal: AbortSignal.timeout(10_000),
   });
@@ -133,7 +133,7 @@ export async function downloadUpdate(
   onResult: (result: UpdaterCallback) => void,
 ): Promise<void> {
   try {
-    const dest = join(tmpdir(), `loading-dock-update-${info.version}`);
+    const dest = join(tmpdir(), `container-cove-update-${info.version}`);
     const res = await fetch(info.downloadUrl, {
       signal: AbortSignal.timeout(120_000),
     });

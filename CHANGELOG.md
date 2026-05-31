@@ -1,10 +1,10 @@
-# Changelog — The Loading Dock(r)
+# Changelog — Container Cove
 
 All notable changes are documented here.  
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).  
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-> The project was originally named **ElectroDocker**; renamed to **The Loading Dock(r)** in v1.1.0.
+> The project was originally named **ElectroDocker**; renamed to **Container Cove** in v1.1.0.
 
 ---
 
@@ -19,7 +19,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **One-click topbar update chip** — replaces the update banner; states: idle → checking → available (click to download) → downloading (inline progress bar + %) → ready (green "✓ Restart to apply").
 - **Desktop shortcut icons** — `.app` bundle created on `~/Desktop` on app install; icon fetched from Dashboard Icons CDN and converted to ICNS via `sips`; removed on app delete.
 - **Tray menu overhaul** — per-app colored dots (🟢/🟡/🔴), click-to-launch/open-window, Stop All, Restart All, Settings, Open Dashboard, Quit.
-- **Default env vars and volumes** for all 26 recommended apps — data stored under `~/.loading-dock/<app>`; media libraries map `~/Movies`, `~/Music`, `~/TV`, `~/Downloads`, `~/Pictures`.
+- **Default env vars and volumes** for all 26 recommended apps — data stored under `~/.container-cove/<app>`; media libraries map `~/Movies`, `~/Music`, `~/TV`, `~/Downloads`, `~/Pictures`.
 - **Open at Login** toggle — macOS login item via `osascript`; persisted in `settings.json`.
 - **New recommended apps** — Navidrome, Homebridge, Puter, Guacamole; all images pinned to `:latest`; Tailscale moved to Self-hosted Essentials.
 - **`app:restart` IPC message** — stop + re-launch in a single action; used by Restart button and Restart All.
@@ -41,7 +41,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [1.1.0] — 2026-05-25
 
 ### Added
-- **App renamed** to **The Loading Dock(r)**; all internal identifiers updated to `loading-dock`.
+- **App renamed** to **Container Cove**; all internal identifiers updated to `loading-dock`.
 - **Custom app icon** (whale + house) in topbar; logo uses Cal Sans from Bunny Fonts.
 - **Iconoir solid icon buttons** in toolbar (check for updates, pull, push, add app) with custom SVGs.
 - **Docker Hub button** moved to toolbar with "Docker Hub" text label.

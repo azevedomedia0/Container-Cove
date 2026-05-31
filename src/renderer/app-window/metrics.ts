@@ -10,7 +10,7 @@ export function maskValue(v: string, maskEnabled: boolean): string {
 export type LogLevel = "all" | "error" | "warn" | "info" | "system";
 
 export function classifyLogLevel(line: string): Exclude<LogLevel, "all"> {
-  if (line.startsWith("[loading-dock]") || line.startsWith("[pull]"))
+  if (line.startsWith("[container-cove]") || line.startsWith("[pull]"))
     return "system";
   const upper = line.toUpperCase();
   if (/\b(FATAL|ERROR|ERR)\b/.test(upper) || upper.includes(" E ")) return "error";

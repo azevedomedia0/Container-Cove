@@ -48,7 +48,7 @@ beforeAll(async () => {
 afterAll(async () => {
   // best-effort cleanup of any leftover smoke containers
   if (!dockerAvailable) return;
-  const candidates = [`loading-dock-smoke-${SMOKE_TAG}`];
+  const candidates = [`container-cove-smoke-${SMOKE_TAG}`];
   for (const name of candidates) {
     const p = Bun.spawn(["docker", "rm", "-f", name], {
       stdout: "pipe",
@@ -74,7 +74,7 @@ describe("smoke: buildDockerRunArgs", () => {
 
   test("container name follows convention", () => {
     const app = makeApp();
-    expect(containerName(app)).toBe(`loading-dock-smoke-${SMOKE_TAG}`);
+    expect(containerName(app)).toBe(`container-cove-smoke-${SMOKE_TAG}`);
   });
 
   test("restart policy added when not 'no'", () => {

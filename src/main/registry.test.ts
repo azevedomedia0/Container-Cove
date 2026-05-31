@@ -25,14 +25,14 @@ describe("registry paths", () => {
 
   test("registry file is apps.json in registry dir", () => {
     expect(getRegistryFile("linux", { HOME: "/home/test" })).toBe(
-      "/home/test/.config/loading-dock/apps.json",
+      "/home/test/.config/container-cove/apps.json",
     );
   });
 });
 
 describe("registry persistence", () => {
   test("save/load preserves last-known running state", async () => {
-    const tmpRoot = await mkdtemp(join(tmpdir(), "loading-dock-test-"));
+    const tmpRoot = await mkdtemp(join(tmpdir(), "container-cove-test-"));
     const registryFile = join(tmpRoot, "apps.json");
     const apps: DockerApp[] = [
       {
@@ -57,7 +57,7 @@ describe("registry persistence", () => {
   });
 
   test("load falls back to stopped for older registries without status", async () => {
-    const tmpRoot = await mkdtemp(join(tmpdir(), "loading-dock-test-"));
+    const tmpRoot = await mkdtemp(join(tmpdir(), "container-cove-test-"));
     const registryFile = join(tmpRoot, "apps.json");
     await Bun.write(
       registryFile,

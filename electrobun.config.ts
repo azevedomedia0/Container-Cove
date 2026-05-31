@@ -1,7 +1,7 @@
 const config = {
   app: {
-    name: "The Loading Dock(r)",
-    identifier: "com.stevenazevedodesign.loadingdock",
+    name: "Container Cove",
+    identifier: "com.stevenazevedodesign.containercove",
     version: "1.2.0",
     icon: "./App_Icon.png",
   },

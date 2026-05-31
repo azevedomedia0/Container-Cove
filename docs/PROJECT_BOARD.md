@@ -26,7 +26,7 @@
 
 ## v1.1 — UI & UX Overhaul (shipped)
 
-- [x] Renamed app to **The Loading Dock(r)**
+- [x] Renamed app to **Container Cove**
 - [x] Cal Sans title font via Bunny Fonts
 - [x] Custom app icon (whale + house) in topbar
 - [x] Iconoir icon buttons in toolbar

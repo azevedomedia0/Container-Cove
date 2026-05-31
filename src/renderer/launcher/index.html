@@ -190,14 +190,14 @@
 
       <!-- Add modal -->
       <div id="modal-add" class="modal hidden">
-        <div class="modal-box">
+        <div class="modal-box modal-box--add">
           <div class="modal-tabs">
             <button class="modal-tab modal-tab--active" data-tab="app" aria-label="Switch to App tab">App</button>
             <button class="modal-tab" data-tab="compose" aria-label="Switch to Compose tab">Compose</button>
           </div>
 
           <!-- Tab: App -->
-          <div id="add-tab-app" class="tab-panel">
+          <div id="add-tab-app" class="tab-panel add-tab-scroll">
             <label>Name <input id="add-name" type="text" placeholder="My App" /></label>
             <label>Image <input id="add-image" type="text" placeholder="nginx:latest" /></label>
             <label>Ports <input id="add-ports" type="text" placeholder="8080:80" /></label>
@@ -236,7 +236,7 @@
           </div>
 
           <!-- Tab: Docker Compose -->
-          <div id="add-tab-compose" class="tab-panel hidden">
+          <div id="add-tab-compose" class="tab-panel add-tab-scroll hidden">
             <label>Project Name <input id="add-compose-project" type="text" placeholder="my-stack" /></label>
             <label>Compose YAML
               <textarea id="add-compose-yaml" rows="12" placeholder="services:&#10;  web:&#10;    image: nginx:latest&#10;    ports:&#10;      - &quot;8080:80&quot;"></textarea>

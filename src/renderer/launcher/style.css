@@ -1005,6 +1005,35 @@ body {
 .modal-box--wide {
   width: 620px;
 }
+.modal-box--add {
+  width: min(400px, 94vw);
+  max-height: 70vh;
+  padding: 20px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+.modal-box--add .modal-tabs {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+.add-tab-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+  margin-right: -4px;
+  padding-bottom: 4px;
+}
+.modal-box--add .modal-actions {
+  flex-shrink: 0;
+  padding: 12px 0 16px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
 .modal-box--confirm {
   width: min(460px, 92vw);
 }

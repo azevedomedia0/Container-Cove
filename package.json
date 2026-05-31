@@ -11,6 +11,8 @@
     "build:linux": "bunx electrobun build --platform linux",
     "build:dmg": "bun scripts/build-macos-dmg.ts",
     "build:win-installer": "bun scripts/build-windows-installer.ts",
+    "build:linux-appimage": "bun scripts/build-linux-appimage.ts",
+    "build:linux-deb": "bun scripts/build-linux-deb.ts",
     "postinstall": "node scripts/patch-electrobun-rpc.mjs",
     "test": "bun test",
     "lint": "eslint \"src/**/*.ts\" \"electrobun.config.ts\"",

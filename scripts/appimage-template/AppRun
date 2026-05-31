@@ -1,0 +1,15 @@
+#!/bin/bash
+# AppImage entry point script
+# Sets up environment and executes the application
+
+# Get the AppImage directory
+APPDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Set library path to include bundled libraries
+export LD_LIBRARY_PATH="${APPDIR}/usr/lib:${LD_LIBRARY_PATH}"
+
+# Set Qt plugin path if Qt libraries are included
+export QT_QPA_PLATFORM_PLUGIN_PATH="${APPDIR}/usr/lib/plugins:${QT_QPA_PLATFORM_PLUGIN_PATH}"
+
+# Execute the application binary
+exec "${APPDIR}/usr/bin/container-cove" "$@"

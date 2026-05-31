@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Container Cove
+Comment=Run containers as desktop apps — no terminal needed.
+Exec=container-cove %F
+Icon=AppIcon
+Categories=Utility;
+Terminal=false
+MimeType=application/x-docker-container;
+Keywords=container;docker;podman;

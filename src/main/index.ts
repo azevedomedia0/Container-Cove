@@ -486,7 +486,7 @@ function createSetupWindow(): Promise<void> {
     });
 
     // FIX 3: Consolidate dom-ready handlers into one listener
-    setupWindow.webview.once("dom-ready", () => {
+    setupWindow.webview.on("dom-ready", () => {
       setupWindow!.show();
       // FIX 5: Validate rpc.send exists before calling
       const rpcSend = (setupWindow as any)?.rpc?.send;
@@ -524,7 +524,7 @@ function openLauncher() {
   });
 
   // FIX 8: Set launcherReady flag in launcher's dom-ready, not in setup handler
-  launcherWindow.webview.once("dom-ready", () => {
+  launcherWindow.webview.on("dom-ready", () => {
     sendToLauncher({ type: "apps:list", apps: state.apps });
     sendToLauncher({
       type: "docker:availability",

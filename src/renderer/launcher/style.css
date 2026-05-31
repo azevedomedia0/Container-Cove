@@ -49,11 +49,11 @@
 /* ── Light mode — the original ocean-blue palette ───────────── */
 [data-theme="light"] {
   --bg: #003a35;
-  --surface: #1f416f;
-  --surface-deep: #132a49;
-  --surface-raised: #28527f;
-  --surface-inset: #193560;
-  --border: #2e5e8e;
+  --surface: #569fe8;
+  --surface-deep: #3a85d0;
+  --surface-raised: #6aaeed;
+  --surface-inset: #4592df;
+  --border: #7fbdf2;
   --accent: #219ebc;
   --accent-hover: #1a85a0;
   --text: #e2f4fb;
@@ -262,9 +262,9 @@ body {
   box-shadow: 0 1px 6px rgba(244, 190, 104, 0.45);
 }
 [data-theme="light"] .search-mode-btn--active {
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 1px 6px rgba(33, 158, 188, 0.45);
+  background: #f4be68;
+  color: #1a1a1a;
+  box-shadow: 0 1px 6px rgba(244, 190, 104, 0.45);
 }
 .search-mode-btn:hover:not(.search-mode-btn--active) {
   color: var(--text);
@@ -560,6 +560,19 @@ body {
   flex-direction: column;
   gap: 12px;
 }
+.sections::-webkit-scrollbar {
+  width: 6px;
+}
+.sections::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sections::-webkit-scrollbar-thumb {
+  background: var(--yellow);
+  border-radius: 3px;
+}
+.sections::-webkit-scrollbar-thumb:hover {
+  background: #d97706;
+}
 .section-dropdown {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -567,7 +580,6 @@ body {
   overflow: hidden;
 }
 #section-installed {
-  max-height: 600px;
   flex-shrink: 0;
 }
 .section-dropdown > summary {
@@ -607,10 +619,9 @@ body {
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 6px;
   padding: 14px;
-  overflow-y: auto;
-  height: 360px;
-  max-height: 80vh;
+  height: auto;
   min-height: 172px;
+  align-items: start;
 }
 .grid-resize-handle {
   display: flex;
@@ -901,6 +912,19 @@ body {
   max-height: 380px;
   overflow-y: auto;
 }
+.store-panel::-webkit-scrollbar {
+  width: 6px;
+}
+.store-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+.store-panel::-webkit-scrollbar-thumb {
+  background: var(--yellow);
+  border-radius: 3px;
+}
+.store-panel::-webkit-scrollbar-thumb:hover {
+  background: #d97706;
+}
 
 .rec-grid {
   display: grid;
@@ -987,12 +1011,17 @@ body {
   color: #fff;
 }
 .btn--danger {
-  background: transparent;
+  background: var(--red);
   border: 1px solid var(--red);
-  color: var(--red);
+  color: #fff;
+}
+.btn--danger:hover {
+  background: #dc2626;
+  border-color: #dc2626;
 }
 .btn--danger.btn--confirming {
-  background: var(--red);
+  background: #b91c1c;
+  border-color: #b91c1c;
   color: #fff;
 }
 .btn--stop {
@@ -1086,6 +1115,19 @@ body {
   gap: 10px;
   padding-right: 4px;
   margin-right: -4px;
+}
+.edit-modal__body::-webkit-scrollbar {
+  width: 6px;
+}
+.edit-modal__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.edit-modal__body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+.edit-modal__body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
 }
 .edit-fields-grid {
   display: grid;
@@ -1445,10 +1487,10 @@ body {
   font-size: 12px;
 }
 .kv-row .kv-key {
-  flex: 0 0 90px;
+  flex: 0 0 99px;
 }
 .kv-row .kv-val {
-  flex: 0 0 130px;
+  flex: 0 0 143px;
 }
 .vol-row input {
   flex: 1;
@@ -1659,36 +1701,46 @@ label.settings-item {
   background: rgba(255,255,255,0.16);
 }
 
-/* ── Toggle switch ──────────────────────────────────────────── */
+/* ── Toggle switch (iOS-style) ─────────────────────────────── */
 .settings-toggle {
-  width: 52px;
-  height: 30px;
+  width: 51px;
+  height: 31px;
   appearance: none;
-  background: rgba(255,255,255,0.18);
+  background: #39393d;
   border-radius: 999px;
   position: relative;
   cursor: pointer;
-  transition: background 0.22s ease;
+  transition: background 0.35s cubic-bezier(0.4, 0.0, 0.2, 1);
   border: none;
   flex-shrink: 0;
 }
 .settings-toggle::before {
   content: "";
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 24px;
-  height: 24px;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
   background: #fff;
-  border-radius: 999px;
-  transition: transform 0.22s ease;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  border-radius: 50%;
+  transition: transform 0.35s cubic-bezier(0.4, 0.0, 0.2, 1);
+  box-shadow:
+    0 3px 8px rgba(0,0,0,0.15),
+    0 1px 1px rgba(0,0,0,0.16),
+    0 0 0 0.5px rgba(0,0,0,0.04);
 }
 .settings-toggle:checked {
   background: #34c759;
 }
 .settings-toggle:checked::before {
-  transform: translateX(22px);
+  transform: translateX(20px);
+}
+
+[data-theme="light"] .settings-toggle {
+  background: #e9e9ea;
+}
+[data-theme="light"] .settings-toggle:checked {
+  background: #34c759;
 }
 
 /* ── Select ─────────────────────────────────────────────────── */
@@ -1723,6 +1775,7 @@ label.settings-item {
   gap: 12px;
   overflow-y: auto;
   background: #002320;
+  border: 2px solid var(--border);
 }
 .onboarding-hero {
   display: flex;
@@ -1730,13 +1783,13 @@ label.settings-item {
   gap: 10px;
 }
 .onboarding-logo {
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
   object-fit: contain;
   flex-shrink: 0;
 }
 .onboarding-title {
-  font-size: 18px;
+  font-size: 24px;
   font-weight: 700;
   font-family:
     "Ysabeau Office",
@@ -1817,7 +1870,7 @@ label.settings-item {
   align-items: center;
   gap: 8px;
   background: var(--surface-inset);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: 8px;
   padding: 10px 12px;
 }
@@ -1866,11 +1919,7 @@ label.settings-item {
   cursor: pointer;
   user-select: none;
 }
-.modal-box .onboarding-dismiss-opt input {
-  width: auto;
-  cursor: pointer;
-  accent-color: var(--accent);
-}
+
 .onboarding-footer__actions {
   display: flex;
   align-items: center;
@@ -1989,4 +2038,99 @@ label.settings-item {
     padding: 8px 4px;
     gap: 10px;
   }
+}
+
+
+/* ── Shoelace theme overrides ──────────────────────────────── */
+body {
+  --sl-color-primary-50: #e2f4fb;
+  --sl-color-primary-100: #b8e4f4;
+  --sl-color-primary-200: #8dd4ed;
+  --sl-color-primary-300: #62c4e6;
+  --sl-color-primary-400: #3ab4de;
+  --sl-color-primary-500: #219ebc;
+  --sl-color-primary-600: #1a85a0;
+  --sl-color-primary-700: #146b82;
+  --sl-color-primary-800: #0e5263;
+  --sl-color-primary-900: #083844;
+  --sl-color-primary-950: #041e24;
+}
+
+/* Switches — red off / green on */
+.settings-item sl-switch::part(control),
+.onboarding-dismiss-opt sl-switch::part(control) {
+  background: var(--red);
+  border-color: var(--red);
+}
+.settings-item sl-switch[checked]::part(control),
+.onboarding-dismiss-opt sl-switch[checked]::part(control) {
+  background: var(--green);
+  border-color: var(--green);
+}
+.settings-item sl-switch::part(thumb),
+.onboarding-dismiss-opt sl-switch::part(thumb) {
+  background: #fff;
+}
+[data-theme="light"] .settings-item sl-switch::part(control),
+[data-theme="light"] .onboarding-dismiss-opt sl-switch::part(control) {
+  background: var(--red);
+  border-color: var(--red);
+}
+[data-theme="light"] .settings-item sl-switch[checked]::part(control),
+[data-theme="light"] .onboarding-dismiss-opt sl-switch[checked]::part(control) {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+/* Settings select — tiny pill */
+.settings-item sl-select {
+  width: 100px !important;
+  min-width: 0 !important;
+}
+.settings-item sl-select::part(control) {
+  background: #d1d5db !important;
+  border: none !important;
+  border-radius: 999px !important;
+  color: #000 !important;
+  font-size: 10px !important;
+  padding: 0 14px 0 8px !important;
+  min-height: 8px !important;
+  height: 15px !important;
+}
+.settings-item sl-select::part(control):hover {
+  background: #c0c4c8 !important;
+}
+.settings-item sl-select::part(display-label) {
+  color: #000 !important;
+  font-size: 10px !important;
+}
+.settings-item sl-select::part(clear-button) {
+  color: #000 !important;
+}
+.settings-item sl-select::part(expand-icon) {
+  color: #000 !important;
+}
+.settings-item sl-select sl-option::part(base) {
+  color: #000 !important;
+}
+.settings-item sl-select sl-option[selected]::part(base) {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Settings button */
+.settings-item__right sl-button::part(base) {
+  background: rgba(255,255,255,0.09);
+  border: none;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 5px;
+  min-height: 24px;
+}
+.settings-item__right sl-button::part(base):hover {
+  background: rgba(255,255,255,0.16);
+}
+.settings-item__right sl-button::part(label) {
+  padding: 0 8px;
 }

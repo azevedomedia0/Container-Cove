@@ -11,6 +11,7 @@
     "build:linux": "bunx electrobun build --platform linux",
     "build:dmg": "bun scripts/build-macos-dmg.ts",
     "build:pkg": "bun scripts/build-macos-pkg.ts",
+    "build:installer": "bun scripts/build-installer.ts",
     "build:win-installer": "bun scripts/build-windows-installer.ts",
     "build:linux-appimage": "bun scripts/build-linux-appimage.ts",
     "build:linux-deb": "bun scripts/build-linux-deb.ts",

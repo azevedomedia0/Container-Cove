@@ -1,4 +1,5 @@
-import { join, dirname } from "path";
+import { join, dirname, resolve } from "path";
+import { mkdirSync, writeFileSync, existsSync } from "fs";
 import type { ContainerStatus, DockerApp } from "../shared/types";
 
 export type StatusCallback = (
@@ -51,6 +52,39 @@ class Semaphore {
   }
 }
 
+// ── Clean Docker config env ───────────────────────────────────────────────────
+//
+// If the user previously had Docker Desktop installed, ~/.docker/config.json
+// often contains `"credsStore": "desktop"` which points to a helper binary
+// that no longer exists.  Podman inherits DOCKER_CONFIG and then fails with:
+//   "error getting credentials - err: exec: \"docker-credential-desktop\":
+//    executable file not found in $PATH"
+//
+// Fix: point DOCKER_CONFIG at a minimal config we own that has no credsStore.
+// This affects only processes spawned by Container Cove — the user's own shell
+// is unaffected.
+
+let _cleanDockerConfigDir: string | undefined;
+
+function podmanEnv(): NodeJS.ProcessEnv {
+  if (!_cleanDockerConfigDir) {
+    const dir = resolve(
+      process.env.HOME ?? "~",
+      ".config",
+      "container-cove",
+      "docker",
+    );
+    const cfgPath = join(dir, "config.json");
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    // Write a minimal valid config with no credsStore
+    if (!existsSync(cfgPath)) {
+      writeFileSync(cfgPath, JSON.stringify({ auths: {} }, null, 2));
+    }
+    _cleanDockerConfigDir = dir;
+  }
+  return { ...process.env, DOCKER_CONFIG: _cleanDockerConfigDir };
+}
+
 // Cap concurrent *informational* Docker CLI spawns (inspect, stats, volume ls,
 // network ls, etc.).  Long-lived spawns (docker run, docker pull) are
 // intentionally excluded — they are user-initiated and already fire-and-forget.
@@ -66,7 +100,7 @@ async function spawnQuery(
   cmd: string[],
 ): Promise<ReturnType<typeof Bun.spawn>> {
   return _querySem.run(async () => {
-    const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
+    const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe", env: podmanEnv() });
     await p.exited;
     return p;
   });
@@ -119,7 +153,7 @@ async function resolveContainerBinary(force = false): Promise<string | null> {
       // without requiring a running daemon / machine.
       const p = Bun.spawn(
         [candidate, "version", "--format", "{{.Client.Version}}"],
-        { stdout: "pipe", stderr: "pipe" },
+        { stdout: "pipe", stderr: "pipe", env: podmanEnv() },
       );
       await p.exited;
       if (p.exitCode === 0) {
@@ -185,6 +219,7 @@ export async function startDockerDaemon(
           const start = Bun.spawn([bin, "machine", "start"], {
             stdout: "pipe",
             stderr: "pipe",
+            env: podmanEnv(),
           });
           await start.exited;
 
@@ -194,6 +229,7 @@ export async function startDockerDaemon(
             Bun.spawn([bin, "machine", "init", "--now"], {
               stdout: "pipe",
               stderr: "pipe",
+              env: podmanEnv(),
             });
           }
         } else {
@@ -212,12 +248,14 @@ export async function startDockerDaemon(
           const start = Bun.spawn([bin, "machine", "start"], {
             stdout: "pipe",
             stderr: "pipe",
+            env: podmanEnv(),
           });
           await start.exited;
           if (start.exitCode !== 0) {
             Bun.spawn([bin, "machine", "init", "--now"], {
               stdout: "pipe",
               stderr: "pipe",
+              env: podmanEnv(),
             });
           }
         } else {
@@ -306,7 +344,7 @@ export async function launchApp(
   const args = buildDockerRunArgs(effectiveApp, containerBin);
 
   try {
-    const proc = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
+    const proc = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: podmanEnv() });
     activeProcs.set(app.id, proc);
     streamLogs(proc.stdout, app.id, onLog);
     streamLogs(proc.stderr, app.id, onLog);
@@ -318,7 +356,7 @@ export async function launchApp(
       "{{.Id}}",
       containerName(app),
     ];
-    const idProc = Bun.spawn(inspectCmd, { stdout: "pipe", stderr: "pipe" });
+    const idProc = Bun.spawn(inspectCmd, { stdout: "pipe", stderr: "pipe", env: podmanEnv() });
     await idProc.exited;
     const rawId = await new Response(idProc.stdout).text();
     const containerId = rawId.trim().slice(0, 12);
@@ -425,6 +463,7 @@ async function pullImage(
   const p = Bun.spawn([dockerBin, "pull", app.image], {
     stdout: "pipe",
     stderr: "pipe",
+    env: podmanEnv(),
   });
   const reader = p.stdout?.getReader();
   const decoder = new TextDecoder();

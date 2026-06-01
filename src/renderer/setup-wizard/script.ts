@@ -6,21 +6,32 @@ import type { RecoveryOption } from "../../main/setup-state";
 // Polyfill ev.on / ev.send to match the Electrobun RPC envelope format:
 //   { type: "message", id: <channel>, payload: <data> }
 const ev = new Electroview({} as any);
+
+// Keep a stable map of all registered handlers so ev.on() calls don't
+// overwrite each other (the original implementation replaced rpcHandler on
+// every call, leaving only the last listener active).
+const _evHandlers = new Map<string, (msg: unknown) => void>();
+
 (ev as any).on = function (
   name: string,
   handler: (msg: unknown) => void,
 ): void {
-  // rpcHandler receives the full RPC envelope from bun; unwrap payload before
-  // dispatching so the handler sees the raw message, not the envelope.
+  _evHandlers.set(name, handler);
+  // Set rpcHandler once; it dispatches to every registered channel.
   this.rpcHandler = (envelope: any) => {
-    if (envelope?.type === "message" && envelope?.id === name) {
-      handler(envelope.payload);
+    if (envelope?.type === "message") {
+      const h = _evHandlers.get(envelope.id as string);
+      if (h) h(envelope.payload);
     }
   };
 };
 (ev as any).send = function (name: string, payload: unknown): void {
   // Wrap in the RPC message envelope that Electrobun's bun-side handler expects.
-  this.bunBridge(JSON.stringify({ type: "message", id: name, payload }));
+  try {
+    this.bunBridge(JSON.stringify({ type: "message", id: name, payload }));
+  } catch (err) {
+    console.error("[setup-wizard] ev.send failed:", err);
+  }
 };
 
 // ── IPC Message Types ───────────────────────────────────────────────

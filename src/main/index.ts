@@ -434,7 +434,7 @@ function createSetupWindow(): Promise<void> {
     });
 
     // FIX 1: Use once() for setup:retry and FIX 6: Extracted to runSetupFlow()
-    rpc.once("setup:retry", async () => {
+    rpc.on("setup:retry", async () => {
       try {
         const result = await runSetupFlow((percent, step) => {
           // Send progress to setup wizard
@@ -492,11 +492,9 @@ function createSetupWindow(): Promise<void> {
     // FIX 3: Consolidate dom-ready handlers into one listener
     setupWindow.webview.on("dom-ready", () => {
       setupWindow!.show();
-      // FIX 5: Validate rpc.send exists before calling
-      const rpcSend = (setupWindow as any)?.rpc?.send;
-      if (rpcSend && typeof rpcSend["ipc-message"] === "function") {
-        rpcSend["ipc-message"]({ type: "setup:ready" });
-      }
+      // Focus the window so the first click lands on the Allow button
+      // instead of just bringing the window to front (macOS behaviour).
+      try { (setupWindow as any).focus?.(); } catch { /* not all versions support it */ }
     });
   });
 }

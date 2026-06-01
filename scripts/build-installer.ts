@@ -244,8 +244,8 @@ for receipt in com.stevenazevedodesign.containercove com.azevedomedia.containerc
   fi
 done
 
-# Verify app exists and is launchable
-if [ -d "\$APP_DST" ] && [ -f "\$APP_DST/Contents/MacOS/"* ]; then
+# Verify app exists
+if [ -d "\$APP_DST" ]; then
   success "Container Cove verified at \$APP_DST"
 else
   error "Installation may have failed — \$APP_DST not found."

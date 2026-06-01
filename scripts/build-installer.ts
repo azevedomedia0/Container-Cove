@@ -173,7 +173,7 @@ echo "  ╚═══════════════════════
 echo ""
 
 # ── Step 1: Install Podman (prerequisite) ─────────────────────────────────────
-info "Step 1/3 — Installing Podman v4.9.2 (prerequisite)…"
+info "Step 1/4 — Installing Podman v4.9.2 (prerequisite)…"
 
 PODMAN_SRC="\$SCRIPT_DIR/bin/podman"
 HELPER_SRC="\$SCRIPT_DIR/bin/podman-mac-helper"
@@ -204,7 +204,7 @@ else
 fi
 
 # ── Step 2: Install Container Cove ────────────────────────────────────────────
-info "Step 2/3 — Installing Container Cove.app…"
+info "Step 2/4 — Installing Container Cove.app…"
 
 APP_SRC="\$SCRIPT_DIR/Container Cove.app"
 APP_DST="/Applications/Container Cove.app"
@@ -233,8 +233,60 @@ fi
 
 success "Container Cove installed → \$APP_DST"
 
-# ── Step 3: Clean up old receipts & verify ────────────────────────────────────
-info "Step 3/3 — Finalising…"
+# ── Step 3: Fix Docker credential store (docker-credential-desktop bug) ────────
+info "Step 3/4 — Fixing Docker credential configuration…"
+
+# Problem: if Docker Desktop was ever installed, ~/.docker/config.json contains
+#   "credsStore": "desktop"
+# which makes Podman (and any Docker-compatible CLI) fail with:
+#   "error getting credentials - err: exec: docker-credential-desktop:
+#    executable file not found in \$PATH"
+# when pulling ANY image — including all recommended apps.
+#
+# Fix A: create Container Cove's own clean config (used at runtime by the app).
+# Fix B: remove the broken credsStore from ~/.docker/config.json if present.
+
+# Determine the home directory of the real (non-root) user
+REAL_USER="\${SUDO_USER:-}"
+if [ -z "\$REAL_USER" ] || [ "\$REAL_USER" = "root" ]; then
+  REAL_USER="\$(stat -f '%Su' /dev/console 2>/dev/null || echo '')"
+fi
+
+if [ -n "\$REAL_USER" ] && [ "\$REAL_USER" != "root" ]; then
+  USER_HOME="\$(eval echo ~\$REAL_USER)"
+
+  # Fix A — pre-create Container Cove's clean Docker config
+  CC_DOCKER_DIR="\$USER_HOME/.config/container-cove/docker"
+  CC_DOCKER_CFG="\$CC_DOCKER_DIR/config.json"
+  /bin/mkdir -p "\$CC_DOCKER_DIR"
+  if [ ! -f "\$CC_DOCKER_CFG" ]; then
+    echo '{ "auths": {} }' > "\$CC_DOCKER_CFG"
+  fi
+  /usr/sbin/chown -R "\$REAL_USER":staff "\$USER_HOME/.config/container-cove"
+  success "Clean Docker config created → \$CC_DOCKER_CFG"
+
+  # Fix B — patch ~/.docker/config.json if credsStore is set to 'desktop'
+  DOCKER_CFG="\$USER_HOME/.docker/config.json"
+  if [ -f "\$DOCKER_CFG" ]; then
+    if grep -q '"credsStore"' "\$DOCKER_CFG" 2>/dev/null; then
+      # Back up first, then strip the credsStore key with Python (available on all macOS)
+      /bin/cp "\$DOCKER_CFG" "\$DOCKER_CFG.bak"
+      python3 -c "
+import json, sys
+with open('\$DOCKER_CFG', 'r') as f:
+    cfg = json.load(f)
+cfg.pop('credsStore', None)
+cfg.pop('credStore', None)
+with open('\$DOCKER_CFG', 'w') as f:
+    json.dump(cfg, f, indent=2)
+" 2>/dev/null && warn "Removed broken credsStore from \$DOCKER_CFG (backup: \$DOCKER_CFG.bak)" \
+             || warn "Could not auto-patch \$DOCKER_CFG — Container Cove uses its own config, so images will still work."
+    fi
+  fi
+fi
+
+# ── Step 4: Clean up old receipts & verify ────────────────────────────────────
+info "Step 4/4 — Finalising…"
 
 # Forget stale pkgutil receipts so future installs don't hit 'upgrade failed'
 for receipt in com.stevenazevedodesign.containercove com.azevedomedia.containercove; do

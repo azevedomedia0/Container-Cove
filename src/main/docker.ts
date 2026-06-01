@@ -1,6 +1,6 @@
-import { join, dirname, resolve } from "path";
-import { mkdirSync, writeFileSync, existsSync } from "fs";
+import { join, dirname } from "path";
 import type { ContainerStatus, DockerApp } from "../shared/types";
+import { podmanEnv } from "./container-env";
 
 export type StatusCallback = (
   id: string,
@@ -50,39 +50,6 @@ class Semaphore {
       this.release();
     }
   }
-}
-
-// ── Clean Docker config env ───────────────────────────────────────────────────
-//
-// If the user previously had Docker Desktop installed, ~/.docker/config.json
-// often contains `"credsStore": "desktop"` which points to a helper binary
-// that no longer exists.  Podman inherits DOCKER_CONFIG and then fails with:
-//   "error getting credentials - err: exec: \"docker-credential-desktop\":
-//    executable file not found in $PATH"
-//
-// Fix: point DOCKER_CONFIG at a minimal config we own that has no credsStore.
-// This affects only processes spawned by Container Cove — the user's own shell
-// is unaffected.
-
-let _cleanDockerConfigDir: string | undefined;
-
-function podmanEnv(): NodeJS.ProcessEnv {
-  if (!_cleanDockerConfigDir) {
-    const dir = resolve(
-      process.env.HOME ?? "~",
-      ".config",
-      "container-cove",
-      "docker",
-    );
-    const cfgPath = join(dir, "config.json");
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    // Write a minimal valid config with no credsStore
-    if (!existsSync(cfgPath)) {
-      writeFileSync(cfgPath, JSON.stringify({ auths: {} }, null, 2));
-    }
-    _cleanDockerConfigDir = dir;
-  }
-  return { ...process.env, DOCKER_CONFIG: _cleanDockerConfigDir };
 }
 
 // Cap concurrent *informational* Docker CLI spawns (inspect, stats, volume ls,

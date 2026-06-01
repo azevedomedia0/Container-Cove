@@ -1,6 +1,7 @@
 import { homedir } from "os";
 import { join } from "path";
 import type { SetupState } from "./setup-state";
+import { podmanEnv } from "./container-env";
 
 export type RecoveryOption = {
   label: string;
@@ -22,7 +23,7 @@ export type PodmanSetupResult =
 async function executeCommand(command: string): Promise<string | null> {
   try {
     const parts = command.split(/\s+/);
-    const proc = Bun.spawn(parts, { stdout: "pipe", stderr: "null" });
+    const proc = Bun.spawn(parts, { stdout: "pipe", stderr: "null", env: podmanEnv() });
     const exitCode = await proc.exited;
 
     if (exitCode === 0) {
@@ -43,7 +44,7 @@ async function executeCommand(command: string): Promise<string | null> {
 async function executeJsonCommand<T>(command: string): Promise<T | null> {
   try {
     const parts = command.split(/\s+/);
-    const proc = Bun.spawn(parts, { stdout: "pipe", stderr: "null" });
+    const proc = Bun.spawn(parts, { stdout: "pipe", stderr: "null", env: podmanEnv() });
     const exitCode = await proc.exited;
 
     if (exitCode === 0) {
@@ -68,7 +69,7 @@ async function executeJsonCommand<T>(command: string): Promise<T | null> {
  */
 async function binaryExists(binaryPath: string): Promise<boolean> {
   try {
-    const proc = Bun.spawn([binaryPath, "--version"], { stdout: "pipe", stderr: "null" });
+    const proc = Bun.spawn([binaryPath, "--version"], { stdout: "pipe", stderr: "null", env: podmanEnv() });
     const exitCode = await proc.exited;
     return exitCode === 0;
   } catch {
@@ -183,6 +184,7 @@ async function setupPodmanMacOS(
         const initProc = Bun.spawn([podmanPath, "machine", "init", "--now"], {
           stdout: "pipe",
           stderr: "null",
+          env: podmanEnv(),
         });
 
         const startTime = Date.now();
@@ -261,6 +263,7 @@ async function setupPodmanMacOS(
         const startProc = Bun.spawn([podmanPath, "machine", "start"], {
           stdout: "pipe",
           stderr: "null",
+          env: podmanEnv(),
         });
 
         const timeout = setTimeout(() => {
@@ -472,6 +475,7 @@ async function setupPodmanWindows(
         const initProc = Bun.spawn([podmanPath, "machine", "init", "--now"], {
           stdout: "pipe",
           stderr: "null",
+          env: podmanEnv(),
         });
 
         const startTime = Date.now();
@@ -550,6 +554,7 @@ async function setupPodmanWindows(
         const startProc = Bun.spawn([podmanPath, "machine", "start"], {
           stdout: "pipe",
           stderr: "null",
+          env: podmanEnv(),
         });
 
         const timeout = setTimeout(() => {
@@ -691,6 +696,7 @@ async function setupPodmanLinux(
         const migrateProc = Bun.spawn([podmanPath, "system", "migrate"], {
           stdout: "pipe",
           stderr: "null",
+          env: podmanEnv(),
         });
 
         const timeout = setTimeout(() => {

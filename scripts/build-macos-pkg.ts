@@ -111,6 +111,9 @@ async function downloadPodman(buildDir: string): Promise<{ podman: string; helpe
 }
 
 // ── Stage root payload ────────────────────────────────────────────
+// Strategy: bundle Podman INSIDE the .app (Contents/MacOS/podman).
+// The postinstall script then copies it from the app to /usr/local/bin.
+// This avoids any separate payload to /usr/local/bin that macOS can block.
 
 function stagePayload(
   stageDir: string,
@@ -128,16 +131,20 @@ function stagePayload(
   cpSync(appSrcPath, appDest, { recursive: true });
   log(`Staged app → ${appDest}`);
 
-  // /usr/local/bin/podman  +  podman-mac-helper
-  const binDir = join(stageDir, "usr", "local", "bin");
-  mkdirSync(binDir, { recursive: true });
-  copyFileSync(podmanBinary, join(binDir, "podman"));
-  chmodSync(join(binDir, "podman"), 0o755);
+  // Embed Podman binaries inside the app bundle (Contents/MacOS/)
+  // postinstall will copy them to /usr/local/bin after the app is installed
+  const macosDir = join(appDest, "Contents", "MacOS");
+  mkdirSync(macosDir, { recursive: true });
+
+  copyFileSync(podmanBinary, join(macosDir, "podman"));
+  chmodSync(join(macosDir, "podman"), 0o755);
+  log("Bundled podman → app bundle Contents/MacOS/podman");
+
   if (existsSync(helperBinary)) {
-    copyFileSync(helperBinary, join(binDir, "podman-mac-helper"));
-    chmodSync(join(binDir, "podman-mac-helper"), 0o755);
+    copyFileSync(helperBinary, join(macosDir, "podman-mac-helper"));
+    chmodSync(join(macosDir, "podman-mac-helper"), 0o755);
+    log("Bundled podman-mac-helper → app bundle Contents/MacOS/podman-mac-helper");
   }
-  log("Staged Podman binaries → /usr/local/bin/");
 }
 
 // ── Scripts (pre/post install) ────────────────────────────────────
@@ -145,62 +152,40 @@ function stagePayload(
 function writeScripts(scriptsDir: string): void {
   mkdirSync(scriptsDir, { recursive: true });
 
-  // preinstall: ensure /usr/local/bin exists (absent on clean macOS installs)
+  // preinstall: ensure /usr/local/bin exists
   const preinstall = `#!/bin/bash
-set -e
-echo "[Container Cove] Preparing installation directories..."
 /bin/mkdir -p /usr/local/bin
 /bin/chmod 755 /usr/local/bin
-/bin/mkdir -p /usr/local
-/bin/chmod 755 /usr/local
-echo "[Container Cove] Directories ready"
 exit 0
 `;
 
-  // postinstall: fix permissions and initialise Podman machine
+  // postinstall: copy Podman from inside the app bundle to /usr/local/bin
   const postinstall = `#!/bin/bash
-set -e
+APP="/Applications/Container Cove.app"
+SRC_PODMAN="$APP/Contents/MacOS/podman"
+SRC_HELPER="$APP/Contents/MacOS/podman-mac-helper"
+DST="/usr/local/bin"
 
-PODMAN=/usr/local/bin/podman
-HELPER=/usr/local/bin/podman-mac-helper
+echo "[Container Cove] Installing Podman to $DST..."
 
-echo "[Container Cove] Verifying Podman installation..."
+/bin/mkdir -p "$DST"
 
-# Ensure binaries are executable
-if [ -f "$PODMAN" ]; then
-  /bin/chmod 755 "$PODMAN"
-  echo "[Container Cove] podman installed at $PODMAN"
-else
-  echo "[Container Cove] ERROR: podman binary not found at $PODMAN"
+if [ ! -f "$SRC_PODMAN" ]; then
+  echo "[Container Cove] ERROR: podman not found inside app bundle at $SRC_PODMAN"
   exit 1
 fi
 
-if [ -f "$HELPER" ]; then
-  /bin/chmod 755 "$HELPER"
-  echo "[Container Cove] podman-mac-helper installed at $HELPER"
+/bin/cp -f "$SRC_PODMAN" "$DST/podman"
+/bin/chmod 755 "$DST/podman"
+echo "[Container Cove] Installed podman → $DST/podman"
+
+if [ -f "$SRC_HELPER" ]; then
+  /bin/cp -f "$SRC_HELPER" "$DST/podman-mac-helper"
+  /bin/chmod 755 "$DST/podman-mac-helper"
+  echo "[Container Cove] Installed podman-mac-helper → $DST/podman-mac-helper"
 fi
 
-# Ensure /usr/local/bin is in PATH
-export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
-
-# Get the actual user (not root)
-REAL_USER="\${SUDO_USER:-\$USER}"
-if [ -z "$REAL_USER" ] || [ "$REAL_USER" = "root" ]; then
-  REAL_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
-fi
-
-echo "[Container Cove] Installing for user: $REAL_USER"
-
-# Initialise Podman machine for the real user (skip if already exists)
-if [ -n "$REAL_USER" ] && [ "$REAL_USER" != "root" ]; then
-  if sudo -u "$REAL_USER" "$PODMAN" machine list --format "{{.Name}}" 2>/dev/null | grep -q .; then
-    echo "[Container Cove] Podman machine already exists — skipping init"
-  else
-    echo "[Container Cove] Podman machine will be initialised on first app launch"
-  fi
-fi
-
-echo "[Container Cove] Installation complete"
+echo "[Container Cove] Podman installation complete"
 exit 0
 `;
 

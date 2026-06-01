@@ -286,6 +286,7 @@ export async function launchApp(
   onLog: LogCallback,
   onPullProgress?: (id: string, status: string, detail?: string) => void,
   resolvedEnv?: Record<string, string>,
+  _retrying = false,
 ): Promise<void> {
   onStatus(app.id, "starting");
 
@@ -313,8 +314,26 @@ export async function launchApp(
   try {
     const proc = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: podmanEnv() });
     activeProcs.set(app.id, proc);
+
+    // Collect stderr so we can detect blob I/O errors at run time
+    let runStderr = "";
+    const decoder = new TextDecoder();
+    const errReader = proc.stderr?.getReader();
+    const stderrCapture = (async () => {
+      if (!errReader) return;
+      while (true) {
+        const { done, value } = await errReader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        runStderr += chunk;
+        // Still forward each line to the log UI
+        for (const line of chunk.split("\n")) {
+          if (line.trim()) onLog(app.id, line.trim());
+        }
+      }
+    })();
+
     streamLogs(proc.stdout, app.id, onLog);
-    streamLogs(proc.stderr, app.id, onLog);
 
     const inspectCmd = [
       containerBin,
@@ -329,8 +348,18 @@ export async function launchApp(
     const containerId = rawId.trim().slice(0, 12);
     onStatus(app.id, "running", containerId);
 
-    proc.exited.then((code) => {
+    proc.exited.then(async (code) => {
+      await stderrCapture;
       activeProcs.delete(app.id);
+
+      // Detect corrupted blob at run time (exit 125) and auto-recover once
+      if (!_retrying && code === 125 && BLOB_IO_ERROR_RE.test(runStderr)) {
+        onLog(app.id, "[container-cove] Corrupted image cache detected — pruning and retrying…");
+        onStatus(app.id, "starting");
+        await pruneCorruptedImage(containerBin, app.image);
+        return launchApp(app, onStatus, onLog, onPullProgress, resolvedEnv, true);
+      }
+
       onStatus(app.id, code === 0 ? "stopped" : "error");
       onLog(app.id, "[container-cove] Container exited with code " + code);
     });
@@ -422,19 +451,52 @@ export function expandVolumePath(vol: string): string {
   return expanded + rest;
 }
 
+// ── Corrupted blob / I/O error detection ─────────────────────────────────────
+// Pattern matches both Docker and Podman error forms:
+//   "blob sha256:... expected at .../blobs/sha256/...: open ...: input/output error"
+//   "rpc error: code = Unknown desc = blob sha256:..."
+const BLOB_IO_ERROR_RE =
+  /blob sha256:[0-9a-f]+.*input\/output error|rpc error.*blob sha256/i;
+
+/**
+ * Prune a corrupted image from local storage so it can be re-pulled cleanly.
+ * Runs `podman image rm --force` then `podman image prune --force` to clear
+ * any dangling layers left behind by the failed download.
+ */
+async function pruneCorruptedImage(bin: string, image: string): Promise<void> {
+  // Remove the named image (ignore errors — it may not be locally tagged yet)
+  const rm = Bun.spawn([bin, "image", "rm", "--force", image], {
+    stdout: "pipe", stderr: "pipe", env: podmanEnv(),
+  });
+  await rm.exited;
+
+  // Prune all dangling images/layers (clears the corrupt blobs)
+  const prune = Bun.spawn([bin, "image", "prune", "--force"], {
+    stdout: "pipe", stderr: "pipe", env: podmanEnv(),
+  });
+  await prune.exited;
+}
+
 async function pullImage(
   dockerBin: string,
   app: DockerApp,
   onPullProgress: (id: string, status: string, detail?: string) => void,
-) {
+  retrying = false,
+): Promise<void> {
   const p = Bun.spawn([dockerBin, "pull", app.image], {
     stdout: "pipe",
     stderr: "pipe",
     env: podmanEnv(),
   });
+
   const reader = p.stdout?.getReader();
+  const errReader = p.stderr?.getReader();
   const decoder = new TextDecoder();
-  if (reader) {
+  let stderrText = "";
+
+  // Stream stdout progress lines
+  const stdoutDone = (async () => {
+    if (!reader) return;
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -443,8 +505,28 @@ async function pullImage(
         if (line.trim()) onPullProgress(app.id, "pulling", line.trim());
       }
     }
+  })();
+
+  // Capture stderr so we can inspect it for blob I/O errors
+  const stderrDone = (async () => {
+    if (!errReader) return;
+    while (true) {
+      const { done, value } = await errReader.read();
+      if (done) break;
+      stderrText += decoder.decode(value);
+    }
+  })();
+
+  await Promise.all([stdoutDone, stderrDone, p.exited]);
+
+  // Detect corrupted blob / I/O error and retry once after pruning
+  if (!retrying && (BLOB_IO_ERROR_RE.test(stderrText) || p.exitCode !== 0 && stderrText)) {
+    if (BLOB_IO_ERROR_RE.test(stderrText)) {
+      onPullProgress(app.id, "pulling", "[container-cove] Corrupted image cache detected — pruning and retrying…");
+      await pruneCorruptedImage(dockerBin, app.image);
+      return pullImage(dockerBin, app, onPullProgress, true);
+    }
   }
-  await p.exited;
 }
 
 // ── Batch health checks ───────────────────────────────────────────────────────

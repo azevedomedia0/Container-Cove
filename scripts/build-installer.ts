@@ -285,8 +285,20 @@ with open('\$DOCKER_CFG', 'w') as f:
   fi
 fi
 
-# ── Step 4: Clean up old receipts & verify ────────────────────────────────────
+# ── Step 4: Clean up old receipts, reset app list & verify ───────────────────
 info "Step 4/4 — Finalising…"
+
+# Remove any previously saved app list so the user starts with a clean slate.
+# Settings (theme, preferences etc.) are kept — only the installed-apps list
+# is cleared.
+if [ -n "\$REAL_USER" ] && [ "\$REAL_USER" != "root" ]; then
+  USER_HOME="\$(eval echo ~\$REAL_USER)"
+  APPS_JSON="\$USER_HOME/Library/Application Support/container-cove/apps.json"
+  if [ -f "\$APPS_JSON" ]; then
+    /bin/rm -f "\$APPS_JSON"
+    info "Cleared previous app list → fresh start"
+  fi
+fi
 
 # Forget stale pkgutil receipts so future installs don't hit 'upgrade failed'
 for receipt in com.stevenazevedodesign.containercove com.azevedomedia.containercove; do

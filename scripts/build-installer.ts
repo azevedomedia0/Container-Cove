@@ -193,6 +193,16 @@ if [ -f "\$HELPER_SRC" ]; then
   /bin/cp -f "\$HELPER_SRC" "\$HELPER_DST"
   /bin/chmod 755 "\$HELPER_DST"
   success "podman-mac-helper installed → \$HELPER_DST"
+
+  # Register podman-mac-helper as a system service so Docker-compatible
+  # tools (docker CLI, docker-compose, etc.) can reach Podman via the
+  # Docker socket at /var/run/docker.sock.
+  # 'install' creates a LaunchDaemon and symlinks the socket — requires root.
+  if "\$HELPER_DST" install 2>/dev/null; then
+    success "podman-mac-helper service registered"
+  else
+    warn "podman-mac-helper service registration skipped (may already be installed or unsupported on this OS version)"
+  fi
 fi
 
 # Verify Podman works

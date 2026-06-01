@@ -315,6 +315,19 @@ else
   error "Installation may have failed — \$APP_DST not found."
 fi
 
+# ── Refresh macOS icon cache so the new icon appears immediately ──────────────
+# Register the app with Launch Services so Finder + Dock pick up the new icon
+/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister \
+  -f "\$APP_DST" 2>/dev/null || true
+
+# Touch the app bundle so Spotlight/Finder notice the update
+/usr/bin/touch "\$APP_DST"
+
+# Restart the Dock so the new icon appears without a logout/reboot
+/usr/bin/killall Dock 2>/dev/null || true
+
+success "Dock icon updated"
+
 echo ""
 echo "  ╔══════════════════════════════════════════╗"
 echo "  ║  ✓  Installation complete!               ║"

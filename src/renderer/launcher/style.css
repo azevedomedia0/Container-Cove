@@ -637,16 +637,22 @@ body {
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 6px;
   padding: 14px;
-  height: 360px;
-  max-height: 80vh;
-  min-height: 172px;
+  /* Height auto-sizes to content; max-height caps at ~1 row so the
+     vertical scrollbar only appears once apps begin a second row.
+     1 row ≈ 14px grid-padding-top + 120px card + 14px grid-padding-bottom = 148px */
+  height: auto;
+  max-height: 152px;
+  min-height: 0;
   align-items: start;
+  overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #f4be69 transparent;
 }
+/* Vertical scrollbar — right side of the panel */
 .app-grid::-webkit-scrollbar {
   width: 6px;
+  height: 0; /* no horizontal scrollbar */
 }
 .app-grid::-webkit-scrollbar-track {
   background: transparent;

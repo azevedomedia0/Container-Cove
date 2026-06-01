@@ -1817,14 +1817,16 @@ if (document.readyState === "loading") {
 
   handle.addEventListener("mousedown", (e: MouseEvent) => {
     startY = e.clientY;
+    // Use the rendered height as the drag start so resize feels natural
     startH = grid.getBoundingClientRect().height;
     document.body.style.cursor = "ns-resize";
     document.body.style.userSelect = "none";
 
     function onMove(e: MouseEvent) {
       const delta = e.clientY - startY;
-      const newH = Math.max(172, Math.min(startH + delta, window.innerHeight * 0.8));
-      grid.style.height = `${newH}px`;
+      // min: 1 row (~152px); max: 80vh
+      const newH = Math.max(152, Math.min(startH + delta, window.innerHeight * 0.8));
+      grid.style.maxHeight = `${newH}px`;
     }
 
     function onUp() {

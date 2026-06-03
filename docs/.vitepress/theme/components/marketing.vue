@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { withBase } from 'vitepress'
+import { useData } from 'vitepress'
+
+const { site } = useData()
+function iconUrl(path: string) {
+	return site.value.base + path.replace(/^\//, '')
+}
 
 interface Feature {
 	title: string
@@ -112,7 +117,7 @@ const features: Feature[] = [
 					>
 						<div class="top-2 right-2 absolute flex justify-center items-center w-14 h-14 shrink-0">
 							<img
-								:src="withBase(feature.icon)"
+								:src="iconUrl(feature.icon)"
 								alt=""
 								class="opacity-40 dark:opacity-30 group-hover:opacity-100 size-full object-contain transition duration-300"
 							/>

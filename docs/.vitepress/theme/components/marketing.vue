@@ -93,7 +93,7 @@ const features: Feature[] = [
 				</section>
 
 				<!-- Logo block -->
-				<div class="group relative flex justify-center items-center order-first lg:order-last lg:mt-20 lg:mr-20 mb-20 w-30 lg:w-55 h-30 lg:h-55 hover:scale-105 transition duration-300 shrink-0">
+				<div class="group relative flex justify-center items-center order-first lg:order-last lg:mt-20 lg:mr-20 mb-20 w-48 md:w-72 lg:w-96 h-48 md:h-72 lg:h-96 hover:scale-105 transition duration-300 shrink-0">
 					<img class="z-1 absolute size-full group-hover:scale-85 transition duration-300 rounded-2xl" src="/logo.png" alt="Container Cove" />
 					<div class="absolute -inset-5 opacity-40 dark:opacity-70 rotate-45 image-bg" />
 				</div>

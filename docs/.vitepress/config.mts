@@ -11,10 +11,8 @@ export default defineConfig({
 	titleTemplate: `:title — ${title}`,
 	description,
 
-	base: '/Container-Cove/',
-
 	head: [
-		['link', { rel: 'icon', type: 'image/png', href: '/Container-Cove/logo.png' }],
+		['link', { rel: 'icon', type: 'image/png', href: '/logo.png' }],
 		['meta', { property: 'og:type', content: 'website' }],
 		['meta', { property: 'og:title', content: title }],
 		['meta', { property: 'og:url', content: url }],

@@ -124,7 +124,7 @@ const features: Feature[] = [
 						</div>
 						<div>
 							<span
-								class="inline-block text-[var(--ui-text-muted)] group-hover:text-[var(--ui-text)] transition font-mono uppercase font-medium tracking-wide"
+								class="inline-block text-[var(--ui-text-muted)] group-hover:text-[var(--ui-text)] transition font-[var(--font-title)] uppercase font-medium tracking-wide"
 								v-text="feature.title"
 							/>
 							<p

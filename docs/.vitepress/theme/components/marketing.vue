@@ -104,7 +104,7 @@ const features: Feature[] = [
 				<template v-for="feature in features" :key="feature.title">
 					<component
 						:is="feature.url ? 'a' : 'div'"
-						class="group relative flex flex-col justify-center gap-4 bg-[var(--ui-bg-elevated)] p-6 rounded-lg ring-1 ring-[var(--ui-border)]"
+						class="group relative flex flex-col justify-center gap-4 bg-[#59a3ea] p-6 rounded-lg ring-1 ring-[var(--ui-border)]"
 						:class="{ 'cursor-pointer': feature.url }"
 						:href="feature.url"
 					>

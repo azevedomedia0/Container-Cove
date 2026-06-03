@@ -7,7 +7,7 @@ Workflow: `.github/workflows/ci.yml`
 1. **lint** — ESLint + TypeScript on Ubuntu (fast gate).
 2. **unit** — `bun test` (excluding E2E) on macOS, Windows, and Linux.
 3. **e2e-linux** — Docker smoke tests on Ubuntu with Docker available.
-4. **e2e-macos** — Docker smoke tests on macOS via Colima.
+4. **e2e-macos** — Docker smoke tests on macOS via OrbStack.
 5. **e2e-windows-skip** — Runs the same smoke file on Windows **without** Docker; tests self-skip when the daemon is unavailable (verifies graceful behavior on developer machines without Docker Desktop).
 6. **build** — Platform artifacts (`build:mac`, `build:win`, `build:linux`).
 

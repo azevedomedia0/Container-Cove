@@ -75,7 +75,7 @@ bun run build:linux-appimage
 bun run build:linux-deb
 
 # Create GitHub release manually
-# 1. Go to https://github.com/azevedomedia0/container-cove/releases/new
+# 1. Go to https://github.com/Container-Cove/Container-Cove/releases/new
 # 2. Tag: v1.3.0
 # 3. Title: "Container Cove 1.3.0"
 # 4. Upload artifacts from `build/` directory

@@ -389,16 +389,21 @@ function setPodmanInstallPromptVisible(visible: boolean) {
   if (onboardingCta) onboardingCta.classList.toggle("hidden", !visible);
 }
 
-function updateOnboardingPodmanCopy(isFirstRun: boolean) {
+function updateOnboardingRuntimeCopy(isFirstRun: boolean) {
   const strong = document.querySelector("#onboarding-podman-install .onboarding-install__copy strong");
   const small = document.querySelector("#onboarding-podman-install .onboarding-install__copy small");
   if (!strong || !small) return;
+  const isMac = navigator.platform.startsWith("Mac");
   if (isFirstRun) {
-    strong.textContent = "Install Podman first";
-    small.textContent = "Container Cove uses Podman to run your apps. Open the install guide, install Podman, then come back and click Retry.";
+    strong.textContent = isMac ? "Install OrbStack first" : "Install Docker Desktop first";
+    small.textContent = isMac
+      ? "Container Cove uses OrbStack to run your apps. Open the install guide, install OrbStack, then come back and click Retry."
+      : "Container Cove needs Docker Desktop or Podman to run apps. Open the install guide, install it, then click Retry.";
   } else {
-    strong.textContent = "Podman is not responding";
-    small.textContent = "Podman was working before but is no longer available. Click Retry to restart it, or open the install guide if it has been uninstalled.";
+    strong.textContent = isMac ? "OrbStack is not responding" : "Container runtime is not responding";
+    small.textContent = isMac
+      ? "OrbStack may have quit. Open OrbStack from your Applications folder, then click Retry."
+      : "The container runtime may have stopped. Click Retry to restart it, or open the install guide if it has been uninstalled.";
   }
 }
 
@@ -447,8 +452,8 @@ function toggleDockerWarning(show: boolean) {
       ? {
           visible: true,
           message: podmanStartAttempted
-            ? "Podman is still coming up. Please wait…"
-            : "Starting Podman — please wait…",
+            ? "Container runtime is still coming up. Please wait…"
+            : "Starting container runtime — please wait…",
           canRetry: false,
           canInstall: false,
         }
@@ -472,7 +477,8 @@ function setDockerWarningState(state: {
   banner.classList.toggle("hidden", !state.visible);
   if (install) {
     install.classList.toggle("hidden", !state.visible || !state.canInstall);
-    install.textContent = "Open install guide";
+    const isMac = navigator.platform.startsWith("Mac");
+    install.textContent = isMac ? "Install OrbStack" : "Open install guide";
   }
   if (detailEl) {
     detailEl.classList.toggle("hidden", !state.visible || !state.detail);
@@ -485,7 +491,8 @@ function setDockerWarningState(state: {
     return;
   }
   podmanStartAttempted = true;
-  label.textContent = state.message ?? "Podman is unavailable.";
+  const isMac = navigator.platform.startsWith("Mac");
+  label.textContent = state.message ?? (isMac ? "OrbStack is unavailable." : "Container runtime is unavailable.");
   retry.classList.toggle("hidden", !state.canRetry);
 }
 
@@ -978,7 +985,7 @@ ev.on("ipc-message", (msg: IpcMessage) => {
           ? { visible: false }
           : {
               visible: true,
-              message: msg.message ?? "Podman is unavailable.",
+              message: msg.message ?? (navigator.platform.startsWith("Mac") ? "OrbStack is unavailable." : "Container runtime is unavailable."),
               detail: msg.detail,
               canRetry: msg.canRetry ?? true,
               canInstall: msg.canInstall ?? true,
@@ -996,7 +1003,7 @@ ev.on("ipc-message", (msg: IpcMessage) => {
       renderGrid();
       setPodmanInstallPromptVisible(podmanAvailable === false);
       setRecommendedSectionOpen(msg.firstRun);
-      updateOnboardingPodmanCopy(msg.firstRun);
+      updateOnboardingRuntimeCopy(msg.firstRun);
       if (msg.firstRun || msg.showOnboarding) showOnboardingPanel();
       break;
     case "desktop:shortcut:progress": {

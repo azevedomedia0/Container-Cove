@@ -10,8 +10,12 @@ Run Docker containers as desktop apps — no terminal needed. Built with [Electr
 
 - [Bun](https://bun.sh) >= 1.0
 - macOS (primary), Windows, or Linux
-- **Podman is bundled with Container Cove** and auto-initializes on first launch (no manual setup required)
-  - Alternatively, Docker Desktop or Docker Engine can be used if already installed
+
+**macOS:** Install [OrbStack](https://orbstack.dev) — `brew install orbstack`
+
+**Linux:** Container Cove includes bundled Podman and auto-initializes on first launch (no setup required). Alternatively, Docker or system Podman can be used if already installed.
+
+**Windows:** Docker Desktop or Windows Subsystem for Linux (WSL2) with Podman
 
 ## Quick Start
 

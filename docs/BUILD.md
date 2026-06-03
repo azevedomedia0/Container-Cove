@@ -157,9 +157,10 @@ Output:
 
 All builds include:
 - Electrobun app binaries and assets
-- **Bundled Podman v4.9.2** (platform-specific binary)
 - Runtime metadata: app name ("Container Cove"), version from `package.json`
 - Platform-specific desktop integration
+
+**macOS note:** No longer bundles Podman. Users must install OrbStack separately.
 
 ### Bundled Podman Information
 
@@ -173,7 +174,7 @@ All builds include:
 
 | Artifact | Size | Notes |
 |----------|------|-------|
-| macOS `.dmg` | ~180 MB | Includes bundled Podman |
+| macOS `.dmg` | ~80 MB | OrbStack required separately |
 | Windows `.exe` installer | ~160 MB | Includes bundled Podman |
 | Linux AppImage | ~150 MB | Includes bundled Podman |
 | Linux `.deb` package | ~140 MB | Includes bundled Podman |
@@ -256,13 +257,14 @@ uname -r
 
 ## Podman Version Management
 
-Podman v4.9.2 is bundled and version-locked to Container Cove 1.2.0.
+**macOS:** No longer bundles Podman. Uses OrbStack (requires separate installation).
 
-### To Update Podman Version
+**Windows & Linux:** Podman v4.9.2 is bundled and version-locked to Container Cove 1.2.0.
 
-1. **Test new version** on all platforms
+### To Update Bundled Podman (Windows/Linux)
+
+1. **Test new version** on Windows and Linux
 2. **Update download URLs** in build scripts:
-   - `scripts/build-macos-dmg.ts`
    - `scripts/build-windows-installer.ts`
    - `scripts/build-linux-appimage.ts`
    - `scripts/build-linux-deb.ts`
@@ -282,13 +284,15 @@ Each Container Cove release locks to a specific Podman version to ensure:
 
 ### Cross-Platform Builds
 
-To build Linux artifacts on macOS/Windows using Docker/Podman:
+To build Linux artifacts on macOS/Windows using Docker/Podman/OrbStack:
 
 ```bash
 # Build Linux artifacts inside container
 docker run -v $(pwd):/work ubuntu:22.04 \
   bash -c "cd /work && apt update && apt install -y curl bun && bun run build:linux-appimage"
 ```
+
+**For macOS developers:** Use [OrbStack](https://orbstack.dev) for faster builds with less resource overhead compared to Podman Machine or Docker Desktop.
 
 ### Signed Artifacts
 
@@ -319,7 +323,7 @@ Container Cove includes `.github/workflows/release.yml` for automated releases:
 1. Push git tag: `git tag v1.2.0 && git push --tags`
 2. GitHub Actions builds all artifacts
 3. Creates draft release with artifacts attached
-4. Skips notarization in CI (requires secrets). To enable: configure `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` in [GitHub Actions secrets](https://github.com/azevedomedia0/container-cove/settings/secrets/actions)
+4. Skips notarization in CI (requires secrets). To enable: configure `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` in [GitHub Actions secrets](https://github.com/Container-Cove/Container-Cove/settings/secrets/actions)
 
 **Local Build Before Release:**
 

@@ -89,7 +89,7 @@ jobs:
   # Stage 3 — E2E smoke tests (Docker required)
   #
   # Linux:   Docker daemon is pre-installed and already running.
-  # macOS:   Docker CLI + Colima (lightweight VM) installed via Homebrew.
+  # macOS:   OrbStack (Docker-compatible runtime) installed via Homebrew.
   # Windows: Linux containers are unavailable on GitHub-hosted Windows
   #          runners without WSL2 reconfiguration.  The smoke tests
   #          detect this via isDockerAvailable() and skip gracefully,
@@ -108,7 +108,7 @@ jobs:
             docker_setup: native
           - os: macOS
             runner: macos-latest
-            docker_setup: colima
+            docker_setup: orbstack
           - os: Windows
             runner: windows-latest
             docker_setup: none
@@ -128,11 +128,11 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - name: Install Docker via Colima (macOS)
-        if: matrix.docker_setup == 'colima'
+      - name: Install OrbStack (macOS)
+        if: matrix.docker_setup == 'orbstack'
         run: |
-          brew install colima docker
-          colima start --cpu 2 --memory 4
+          brew install orbstack
+          # OrbStack is automatically started in the background, but we wait for docker to be ready
           for i in $(seq 1 30); do docker info &>/dev/null && break || sleep 2; done
           docker pull alpine:3.19
 

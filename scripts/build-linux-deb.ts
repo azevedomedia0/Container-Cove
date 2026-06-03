@@ -29,7 +29,7 @@ function createDebianControl(version: string): string {
 Version: ${version}
 Architecture: amd64
 Maintainer: Steven Azevedo <me@stevenazevedo.com>
-Homepage: https://github.com/stevenazevedo/container-cove
+Homepage: https://github.com/Container-Cove/Container-Cove
 Description: Run containers as desktop apps — no terminal needed.
 Installed-Size: 250000
 Depends: libgtk-3-0, libayatana-appindicator3-1

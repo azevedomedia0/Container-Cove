@@ -82,94 +82,6 @@ async function executeCommand(
   });
 }
 
-/**
- * Download and extract Podman binaries from GitHub releases (macOS arm64).
- * Returns the path to the extracted podman binary.
- */
-async function downloadPodman(outputDir: string): Promise<string> {
-  const arch = process.arch === "arm64" ? "arm64" : "amd64";
-  const zipName = `podman-remote-release-darwin_${arch}.zip`;
-  const downloadUrl = `https://github.com/containers/podman/releases/download/v4.9.2/${zipName}`;
-  const zipPath = join(outputDir, zipName);
-  const extractDir = join(outputDir, "podman-extract");
-  const binaryPath = join(extractDir, "podman-4.9.2", "usr", "bin", "podman");
-  const helperPath = join(extractDir, "podman-4.9.2", "usr", "bin", "podman-mac-helper");
-
-  if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true });
-
-  // Re-use cached extraction if already done
-  if (existsSync(binaryPath)) {
-    log(`Using cached Podman binary at ${binaryPath}`);
-    return binaryPath;
-  }
-
-  log(`Downloading Podman v4.9.2 (${arch})...`);
-  const dl = await executeCommand("curl", ["-L", "--max-time", "120", "-o", zipPath, downloadUrl]);
-  if (dl.code !== 0) throw new Error(`Failed to download Podman: ${dl.stderr || dl.stdout}`);
-  log(`Downloaded to ${zipPath}`);
-
-  if (existsSync(extractDir)) rmSync(extractDir, { recursive: true });
-  mkdirSync(extractDir, { recursive: true });
-
-  log("Extracting Podman archive...");
-  const ex = await executeCommand("unzip", ["-o", zipPath, "podman-4.9.2/usr/bin/podman", "podman-4.9.2/usr/bin/podman-mac-helper", "-d", extractDir]);
-  if (ex.code !== 0) throw new Error(`Failed to extract Podman: ${ex.stderr || ex.stdout}`);
-
-  if (!existsSync(binaryPath)) throw new Error(`Podman binary not found after extraction: ${binaryPath}`);
-
-  // Make both binaries executable
-  chmodSync(binaryPath, 0o755);
-  if (existsSync(helperPath)) chmodSync(helperPath, 0o755);
-
-  log(`Podman binary ready at ${binaryPath}`);
-  return binaryPath;
-}
-
-/**
- * Bundle Podman binary inside .app bundle
- */
-async function bundlePodmanBinary(
-  appPath: string,
-  podmanBinary: string
-): Promise<void> {
-  log("Bundling Podman binary into .app bundle...");
-
-  if (!existsSync(appPath)) {
-    throw new Error(`App bundle not found at ${appPath}`);
-  }
-
-  if (!existsSync(podmanBinary)) {
-    throw new Error(`Podman binary not found at ${podmanBinary}`);
-  }
-
-  const contentsPath = join(appPath, "Contents");
-  const macosPath = join(contentsPath, "MacOS");
-
-  // Create MacOS directory if it doesn't exist
-  if (!existsSync(macosPath)) {
-    mkdirSync(macosPath, { recursive: true });
-    log(`Created ${macosPath}`);
-  }
-
-  const targetPath = join(macosPath, "podman");
-  const helperSrc = join(podmanBinary, "..", "podman-mac-helper");
-  const helperDst = join(macosPath, "podman-mac-helper");
-
-  // Copy podman binary
-  copyFileSync(podmanBinary, targetPath);
-  chmodSync(targetPath, 0o755);
-  log(`Bundled podman → ${targetPath}`);
-
-  // Copy podman-mac-helper if present
-  if (existsSync(helperSrc)) {
-    copyFileSync(helperSrc, helperDst);
-    chmodSync(helperDst, 0o755);
-    log(`Bundled podman-mac-helper → ${helperDst}`);
-  }
-
-  const verifyResult = await executeCommand("file", [targetPath]);
-  if (verifyResult.code === 0) log(`Verified: ${verifyResult.stdout.trim()}`);
-}
 
 /**
  * Code sign the .app bundle
@@ -333,25 +245,21 @@ export async function buildMacOSDMG(options: BuildOptions): Promise<void> {
   try {
     log("Starting macOS DMG build process...");
 
-    // Step 1: Download Podman and bundle into .app
-    const podmanBinary = await downloadPodman(options.outputDir);
-    await bundlePodmanBinary(options.appPath, podmanBinary);
-
-    // Step 2: Code sign (if identity provided)
+    // Step 1: Code sign (if identity provided)
     if (options.signIdentity) {
       await signApp(options.appPath, options.signIdentity);
     } else {
       log("Skipping code signing: APPLE_SIGNING_IDENTITY not provided");
     }
 
-    // Step 4: Create DMG
+    // Step 2: Create DMG
     const dmgPath = await createDMG(
       options.appPath,
       options.outputDir,
       options.version
     );
 
-    // Step 5: Notarize (if credentials provided and enabled)
+    // Step 3: Notarize (if credentials provided and enabled)
     if (options.notarize !== false) {
       await notarizeDMG(dmgPath);
     }

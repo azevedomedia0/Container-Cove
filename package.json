@@ -1,6 +1,6 @@
 {
   "name": "container-cove",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Run containers as desktop apps",
   "license": "MIT",
   "scripts": {

@@ -56,7 +56,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Sticky footer** — always visible while sections scroll.
 - **`app:add` GET button** pre-fills env vars and volumes from the recommended-app definition.
 - **App window Web UI tab** — primary view is an `<iframe>` that auto-loads `openUrl` when the container starts; Logs tab preserves existing sidebar + log panel.
-- **GitHub repository** linked: https://github.com/azevedomedia0/LoadingDock_R
+- **GitHub repository** linked: https://github.com/Container-Cove/Container-Cove
 
 ### Changed
 - Background colour updated to `#669bbc`; surface to `#02395a`.

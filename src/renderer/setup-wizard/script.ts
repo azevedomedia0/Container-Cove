@@ -213,6 +213,40 @@ ev.on("setup:error", (payload: SetupErrorMessage) => {
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         optionDiv.appendChild(link);
+      } else if (option.action === "install-orbstack") {
+        const btn = document.createElement("button");
+        btn.textContent = "Install OrbStack Now";
+        btn.style.cssText = "padding: 8px 16px; margin: 8px 0; background: #007AFF; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;";
+        btn.addEventListener("click", () => {
+          ev.send("setup:install-orbstack", { installScript: option.installScript });
+          btn.disabled = true;
+          btn.textContent = "Installing...";
+          showScreen("progress");
+        });
+        optionDiv.appendChild(btn);
+
+        const note = document.createElement("p");
+        note.style.fontSize = "12px";
+        note.style.color = "#666";
+        note.textContent = "Installs via Homebrew. You may be prompted for your password.";
+        optionDiv.appendChild(note);
+      } else if (option.action === "install-docker") {
+        const btn = document.createElement("button");
+        btn.textContent = "Install Docker Desktop Now";
+        btn.style.cssText = "padding: 8px 16px; margin: 8px 0; background: #0073EC; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;";
+        btn.addEventListener("click", () => {
+          ev.send("setup:install-docker", { installScript: option.installScript });
+          btn.disabled = true;
+          btn.textContent = "Installing...";
+          showScreen("progress");
+        });
+        optionDiv.appendChild(btn);
+
+        const note = document.createElement("p");
+        note.style.fontSize = "12px";
+        note.style.color = "#666";
+        note.textContent = "Installs Docker Desktop via Homebrew Cask (~500 MB). You may be prompted for your password.";
+        optionDiv.appendChild(note);
       } else {
         console.warn("Unknown recovery action:", option.action);
       }

@@ -9,10 +9,11 @@ export type Platform = "darwin" | "win32" | "linux";
 
 export interface RecoveryOption {
   label: string;
-  action: "retry" | "fallback-docker" | "open-docs" | "open-uninstall-guide" | "cancel";
+  action: "retry" | "fallback-docker" | "open-docs" | "open-uninstall-guide" | "cancel" | "install-orbstack" | "install-docker";
   url?: string;
   description?: string;
   command?: string;
+  installScript?: string;
 }
 
 export interface SetupProgress {

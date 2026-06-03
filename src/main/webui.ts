@@ -22,8 +22,11 @@ export function openWebUiWindow(app: DockerApp): string | null {
     frame: { x: 120, y: 80, width: 1280, height: 820 },
   } as any);
 
-  win.on("close", () => {
-    webUiWindows.delete(app.id);
+  win.on("close", (e: any) => {
+    if (e && typeof e.preventDefault === "function") {
+      e.preventDefault();
+    }
+    win.hide();
   });
   webUiWindows.set(app.id, win);
   return null;

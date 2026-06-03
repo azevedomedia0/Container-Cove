@@ -1742,19 +1742,19 @@ Modify `README.md`, replace the Prerequisites section:
 ## Installation
 
 ### macOS
-Download the latest [.dmg release](https://github.com/stevenazevedodesign/container-cove/releases):
+Download the latest [.dmg release](https://github.com/Container-Cove/Container-Cove/releases):
 1. Open `The-Loading-Dock-r-*.dmg`
 2. Drag `Container Cove.app` to `/Applications`
 3. Launch the app — Podman Machine initializes automatically on first run
 
 ### Windows
-Download the latest [installer](https://github.com/stevenazevedodesign/container-cove/releases):
+Download the latest [installer](https://github.com/Container-Cove/Container-Cove/releases):
 1. Run `The-Loading-Dock-r-*-setup.exe`
 2. Follow the installer wizard
 3. Launch the app — Docker or Podman initializes on first run
 
 ### Linux
-Download the latest [AppImage](https://github.com/stevenazevedodesign/container-cove/releases):
+Download the latest [AppImage](https://github.com/Container-Cove/Container-Cove/releases):
 1. Download `The-Loading-Dock-r-*-x86_64.AppImage`
 2. Run: `./The-Loading-Dock-r-*-x86_64.AppImage`
 3. Or install the .deb: `sudo apt install ./loading-dock_*.deb`
@@ -1778,7 +1778,7 @@ Create `docs/INSTALLATION.md`:
 
 ### From Release (.dmg)
 
-1. Download `The-Loading-Dock-r-1.2.0.dmg` from [Releases](https://github.com/stevenazevedodesign/container-cove/releases)
+1. Download `The-Loading-Dock-r-1.2.0.dmg` from [Releases](https://github.com/Container-Cove/Container-Cove/releases)
 2. Open the .dmg file
 3. Drag `Container Cove.app` to `/Applications`
 4. Eject the .dmg (safe to delete)
@@ -1808,7 +1808,7 @@ Create `docs/INSTALLATION.md`:
 
 ### From Release (.exe)
 
-1. Download `The-Loading-Dock-r-1.2.0-setup.exe` from [Releases](https://github.com/stevenazevedodesign/container-cove/releases)
+1. Download `The-Loading-Dock-r-1.2.0-setup.exe` from [Releases](https://github.com/Container-Cove/Container-Cove/releases)
 2. Run the installer
 3. Follow the wizard (no admin required)
 4. Launch from Start Menu or Desktop shortcut
@@ -1838,7 +1838,7 @@ Create `docs/INSTALLATION.md`:
 
 ### From Release (AppImage)
 
-1. Download `The-Loading-Dock-r-1.2.0-x86_64.AppImage` from [Releases](https://github.com/stevenazevedodesign/container-cove/releases)
+1. Download `The-Loading-Dock-r-1.2.0-x86_64.AppImage` from [Releases](https://github.com/Container-Cove/Container-Cove/releases)
 2. Make it executable: `chmod +x The-Loading-Dock-r-1.2.0-x86_64.AppImage`
 3. Run: `./The-Loading-Dock-r-1.2.0-x86_64.AppImage`
 

@@ -32,6 +32,7 @@ import { handleSettings } from "./ipc-handlers/settings";
 import { handleUpdater } from "./ipc-handlers/updater";
 import { handleRegistry } from "./ipc-handlers/registry";
 import { setupPodman } from "./podman-setup";
+import { setupContainerRuntimeMacOS } from "./orbstack-setup";
 import { SetupState } from "./setup-state";
 
 // ── Tray icon ─────────────────────────────────────────────────────────────────
@@ -103,41 +104,41 @@ $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNoti
 $notifier.Show([Windows.UI.Notifications.ToastNotification]::new($template))
   `.trim(),
 );
-function getPodmanInstallUrl(): string {
+function getRuntimeInstallUrl(): string {
   if (process.platform === "darwin") {
-    return "https://podman.io/getting-started/installation#macos";
+    return "https://orbstack.dev/download";
   }
   if (process.platform === "win32") {
-    return "https://podman.io/getting-started/installation#windows";
+    return "https://www.docker.com/products/docker-desktop";
   }
   return "https://podman.io/docs/installation";
 }
 
-function getPodmanStateHint(
+function getRuntimeStateHint(
   context: "first-run" | "unavailable",
 ): { message: string; detail: string } {
   if (process.platform === "darwin") {
     if (context === "first-run") {
       return {
-        message: "Podman is not installed.",
-        detail: "Install Podman Desktop from podman.io, or run brew install podman in Terminal, then click Retry.",
+        message: "OrbStack is not installed.",
+        detail: "Install OrbStack from orbstack.dev, or run brew install orbstack in Terminal, then click Retry.",
       };
     }
     return {
-      message: "Podman is not responding.",
-      detail: "Podman Desktop may have quit or the VM stopped. Open Podman Desktop, then click Retry.",
+      message: "OrbStack is not responding.",
+      detail: "OrbStack may have quit. Open OrbStack from your Applications folder, then click Retry.",
     };
   }
   if (process.platform === "win32") {
     if (context === "first-run") {
       return {
-        message: "Podman is not installed.",
-        detail: "Install Podman Desktop (includes WSL2 and podman machine setup), then click Retry.",
+        message: "Docker Desktop is not installed.",
+        detail: "Install Docker Desktop from docker.com (includes WSL2 setup), then click Retry.",
       };
     }
     return {
-      message: "Podman is not responding.",
-      detail: "The Podman machine may have stopped. Click Retry to start it, or open Podman Desktop.",
+      message: "Docker Desktop is not responding.",
+      detail: "Docker Desktop may have stopped. Open Docker Desktop from the Start Menu, then click Retry.",
     };
   }
   // Linux
@@ -339,7 +340,7 @@ async function handleIpc(message: IpcMessage) {
     return;
   }
   if (message.type === "podman:install") {
-    Utils.openExternal(getPodmanInstallUrl());
+    Utils.openExternal(getRuntimeInstallUrl());
     return;
   }
   if (await handleApps(message, ctx)) return;
@@ -354,6 +355,23 @@ async function runSetupFlow(
   onProgress: (percent: number, step: string) => void,
 ): Promise<{ success: boolean; error?: string; recoveryOptions?: any[] }> {
   const setupState = new SetupState();
+
+  // On macOS, check for OrbStack/Docker first (before Podman)
+  if (process.platform === "darwin") {
+    const orbStackResult = await setupContainerRuntimeMacOS(onProgress, setupState);
+    if (orbStackResult.success) {
+      // OrbStack or Docker found — setup complete
+      return { success: true };
+    }
+    // OrbStack/Docker setup failed — show recovery options
+    return {
+      success: false,
+      error: orbStackResult.error,
+      recoveryOptions: orbStackResult.recoveryOptions,
+    };
+  }
+
+  // On other platforms, use Podman setup as normal
   return await setupPodman(setupState, onProgress);
 }
 
@@ -476,6 +494,204 @@ function createSetupWindow(): Promise<void> {
       }
     });
 
+    // Handle OrbStack installation request
+    rpc.on("setup:install-orbstack", async (payload: { installScript?: string }) => {
+      try {
+        if (!payload.installScript) {
+          throw new Error("No install script provided");
+        }
+
+        // Execute the install script
+        const tmpScript = join(tmpdir(), "orbstack-install.sh");
+        writeFileSync(tmpScript, payload.installScript);
+
+        const proc = Bun.spawn(["bash", tmpScript], {
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+
+        const exitCode = await proc.exited;
+
+        if (exitCode === 0) {
+          // Installation succeeded — retry setup
+          if (setupWindow) {
+            safeSend(setupWindow.webview, {
+              type: "setup:progress",
+              percentComplete: 50,
+              currentStep: "OrbStack installed, verifying installation...",
+            });
+          }
+
+          // Wait a moment for OrbStack to become available
+          await new Promise(r => setTimeout(r, 2000));
+
+          // Retry the setup flow
+          const retryResult = await runSetupFlow((percent, step) => {
+            if (setupWindow) {
+              safeSend(setupWindow.webview, {
+                type: "setup:progress",
+                percentComplete: percent,
+                currentStep: step,
+              });
+            }
+          });
+
+          if (retryResult.success) {
+            if (setupWindow) {
+              safeSend(setupWindow.webview, { type: "setup:complete" });
+            }
+            dockerAvailable = true;
+          } else {
+            if (setupWindow) {
+              safeSend(setupWindow.webview, {
+                type: "setup:error",
+                message: retryResult.error || "Setup failed after OrbStack installation",
+                recoveryOptions: (retryResult as any).recoveryOptions || [],
+              });
+            }
+          }
+        } else {
+          const stderr = await new Response(proc.stderr).text();
+          throw new Error(`Installation failed: ${stderr || "Unknown error"}`);
+        }
+      } catch (err) {
+        recordError("setup:install-orbstack", String(err));
+        // OrbStack install failed — promote Docker Desktop as the fallback
+        const dockerInstallScript = `#!/bin/bash
+set -euo pipefail
+info() { echo "[Docker Install] $1"; }
+warn() { echo "[Docker Install] ⚠ $1"; }
+if ! command -v brew >/dev/null 2>&1; then
+  warn "Homebrew not found. Installing Homebrew first..."
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+info "Installing Docker Desktop..."
+brew install --cask docker
+open -a Docker 2>/dev/null || true
+info "Waiting for Docker to start..."
+for i in $(seq 1 30); do
+  if docker info >/dev/null 2>&1; then
+    info "✓ Docker Desktop is running!"
+    exit 0
+  fi
+  sleep 2
+done
+warn "Docker Desktop installed but not yet running."
+warn "Please open Docker Desktop from Applications, then click Retry."
+exit 1
+`;
+        if (setupWindow) {
+          safeSend(setupWindow.webview, {
+            type: "setup:error",
+            message: `OrbStack installation failed: ${err instanceof Error ? err.message : String(err)}`,
+            recoveryOptions: [
+              {
+                label: "Install Docker Desktop Instead",
+                action: "install-docker",
+                description: "Use Docker Desktop as an alternative to OrbStack",
+                installScript: dockerInstallScript,
+              },
+              {
+                label: "Retry OrbStack",
+                action: "retry",
+              },
+              {
+                label: "Install Manually",
+                action: "open-docs",
+                url: "https://orbstack.dev/download",
+                description: "Download OrbStack from orbstack.dev",
+              },
+            ],
+          });
+        }
+      }
+    });
+
+    // Install Docker Desktop when OrbStack install has failed
+    rpc.on("setup:install-docker", async (payload: { installScript?: string }) => {
+      try {
+        if (!payload.installScript) {
+          throw new Error("No install script provided");
+        }
+
+        const tmpScript = join(tmpdir(), "docker-install.sh");
+        writeFileSync(tmpScript, payload.installScript);
+
+        if (setupWindow) {
+          safeSend(setupWindow.webview, {
+            type: "setup:progress",
+            percentComplete: 10,
+            currentStep: "Installing Docker Desktop via Homebrew...",
+          });
+        }
+
+        const proc = Bun.spawn(["bash", tmpScript], {
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+
+        const exitCode = await proc.exited;
+
+        if (exitCode === 0) {
+          if (setupWindow) {
+            safeSend(setupWindow.webview, {
+              type: "setup:progress",
+              percentComplete: 80,
+              currentStep: "Docker Desktop installed, verifying...",
+            });
+          }
+
+          await new Promise(r => setTimeout(r, 2000));
+
+          const retryResult = await runSetupFlow((percent, step) => {
+            if (setupWindow) {
+              safeSend(setupWindow.webview, {
+                type: "setup:progress",
+                percentComplete: percent,
+                currentStep: step,
+              });
+            }
+          });
+
+          if (retryResult.success) {
+            if (setupWindow) safeSend(setupWindow.webview, { type: "setup:complete" });
+            dockerAvailable = true;
+          } else {
+            if (setupWindow) {
+              safeSend(setupWindow.webview, {
+                type: "setup:error",
+                message: retryResult.error || "Setup failed after Docker Desktop installation",
+                recoveryOptions: (retryResult as any).recoveryOptions || [],
+              });
+            }
+          }
+        } else {
+          const stderr = await new Response(proc.stderr).text();
+          throw new Error(stderr || "Docker Desktop installation failed");
+        }
+      } catch (err) {
+        recordError("setup:install-docker", String(err));
+        if (setupWindow) {
+          safeSend(setupWindow.webview, {
+            type: "setup:error",
+            message: `Docker Desktop installation failed: ${err instanceof Error ? err.message : String(err)}`,
+            recoveryOptions: [
+              {
+                label: "Retry",
+                action: "retry",
+              },
+              {
+                label: "Install Docker Manually",
+                action: "open-docs",
+                url: "https://www.docker.com/products/docker-desktop",
+                description: "Download Docker Desktop from docker.com",
+              },
+            ],
+          });
+        }
+      }
+    });
+
     // FIX 1: Use once() for setup:finished to auto-unsubscribe
     // NOTE: Do NOT set launcherReady here - let launcher's dom-ready handler set it (FIX 8)
     rpc.once("setup:finished", () => {
@@ -533,10 +749,10 @@ function openLauncher() {
       available: dockerAvailable,
       message: dockerAvailable
         ? undefined
-        : getPodmanStateHint(isFirstRun ? "first-run" : "unavailable").message,
+        : getRuntimeStateHint(isFirstRun ? "first-run" : "unavailable").message,
       detail: dockerAvailable
         ? undefined
-        : getPodmanStateHint(isFirstRun ? "first-run" : "unavailable").detail,
+        : getRuntimeStateHint(isFirstRun ? "first-run" : "unavailable").detail,
       canRetry: !dockerAvailable,
       canInstall: !dockerAvailable,
     });
@@ -674,7 +890,7 @@ async function checkAndRunSetup(): Promise<boolean> {
   const runtimeAvailable = await isDockerAvailable();
 
   if (!runtimeAvailable && !setupStarted) {
-    console.log("[container-cove] Podman/Docker not available — launching setup wizard…");
+    console.log("[container-cove] Container runtime not available — launching setup wizard…");
     await createSetupWindow();
     // After setup completes or is cancelled, check again
     return await isDockerAvailable();
@@ -722,11 +938,11 @@ async function main() {
   setupTray();
   setupMenu();
 
-  // Run setup wizard if Podman/Docker is not available on first run
+  // Run setup wizard if container runtime is not available
   const runtimeReady = await checkAndRunSetup();
 
   if (!runtimeReady && !setupStarted) {
-    console.error("[container-cove] Podman/Docker not available after setup attempt. Exiting.");
+    console.error("[container-cove] Container runtime not available after setup attempt. Exiting.");
     process.exit(1);
   }
 
@@ -758,7 +974,7 @@ async function ensureDockerRunning() {
   sendToLauncher({
     type: "docker:availability",
     available: false,
-    message: "Starting Podman — please wait…",
+    message: "Starting container runtime — please wait…",
     canRetry: false,
     canInstall: false,
   });
@@ -766,14 +982,14 @@ async function ensureDockerRunning() {
     if (ready) {
       dockerAvailable = true;
       sendToLauncher({ type: "docker:availability", available: true, canRetry: false });
-      console.log("[container-cove] Podman is ready.");
+      console.log("[container-cove] Container runtime is ready.");
       void autoLaunchAllApps();
     } else {
-      console.error("[container-cove] Podman did not become ready within the timeout.");
+      console.error("[container-cove] Container runtime did not become ready within the timeout.");
       sendToLauncher({
         type: "docker:availability",
         available: false,
-        ...getPodmanStateHint("unavailable"),
+        ...getRuntimeStateHint("unavailable"),
         canRetry: true,
         canInstall: true,
       });

@@ -6,23 +6,29 @@ Container Cove bundles Podman for seamless container management. No terminal nee
 
 ### macOS
 
-1. Download `Container Cove-1.2.0.dmg` from [releases](https://github.com/azevedomedia0/container-cove/releases)
-2. Open the `.dmg` file and drag `Container Cove.app` to `/Applications`
-3. Launch Container Cove from Applications folder (or Spotlight: `Cmd+Space` → "Container Cove")
-4. Setup wizard appears (one-time)
-   - Click "Allow" to initialize Podman Machine (~2-3 minutes)
-   - Progress bar shows initialization steps
-   - Real-time status updates
-5. Done! Launcher grid appears with recommended catalog
+**Prerequisites:** OrbStack (lightweight Docker alternative)
+
+1. Install OrbStack: `brew install orbstack` or [orbstack.dev](https://orbstack.dev)
+2. Download `Container Cove-1.2.0.dmg` from [releases](https://github.com/Container-Cove/Container-Cove/releases)
+3. Open the `.dmg` file and drag `Container Cove.app` to `/Applications`
+4. Launch Container Cove from Applications folder (or Spotlight: `Cmd+Space` → "Container Cove")
+5. Setup wizard detects OrbStack automatically
+6. Done! Launcher grid appears with recommended catalog
+
+**Why OrbStack?**
+- Lightweight (no heavy VM overhead like Podman Machine)
+- Fast startup and responsive
+- Native Docker CLI compatibility
+- Better macOS integration
 
 **Troubleshooting:**
-- If Podman Machine init fails: click "View Troubleshooting Guide"
-- To reinstall: delete `/Applications/Container Cove.app`
-- To remove all data: also delete `~/.container-cove/` and `~/.podman/`
+- **OrbStack not detected:** Ensure it's installed and running (`brew install orbstack`)
+- **To reinstall:** Delete `/Applications/Container Cove.app`
+- **To remove all data:** Also delete `~/.container-cove/`
 
 ### Windows
 
-1. Download `Container Cove Setup 1.2.0.exe` from [releases](https://github.com/azevedomedia0/container-cove/releases)
+1. Download `Container Cove Setup 1.2.0.exe` from [releases](https://github.com/Container-Cove/Container-Cove/releases)
 2. Run installer (no admin elevation needed)
 3. Select installation directory (default: `C:\Program Files\Container Cove`)
 4. Click "Install" and wait for completion
@@ -174,13 +180,15 @@ rm -rf ~/.container-cove/  # Optional: delete app data
 
 ### macOS
 
-**Podman Machine won't initialize:**
-- Check available disk space: `df -h`
-- Verify virtualization enabled: System Settings → General → Sharing → check if any VM software running
-- Manual recovery: `podman machine rm default && podman machine init`
+**OrbStack not working:**
+- Verify OrbStack is installed: `which docker` should show OrbStack's Docker
+- Restart OrbStack: Open OrbStack.app or use `orbctl restart`
+- Check system resources: Ensure sufficient disk space and RAM
+- Reinstall: `brew uninstall orbstack && brew install orbstack`
 
-**"Podman binary not found":**
-- Bundled binary may be corrupted; reinstall Container Cove from `.dmg`
+**Fallback to Docker Desktop:**
+- Install [Docker Desktop](https://docker.com/products/docker-desktop)
+- Container Cove will automatically detect and use it if OrbStack is unavailable
 
 ### Windows
 
@@ -223,13 +231,22 @@ rm -rf ~/.container-cove/  # Optional: delete app data
 
 ## Advanced Setup
 
-### Use Existing Docker Installation
+### Container Runtime Priority
 
-If you have Docker Desktop installed, Container Cove will detect and prefer it:
+Container Cove automatically detects and uses available runtimes in this order:
 
-1. Ensure Docker Desktop is running
-2. Launch Container Cove
-3. Setup wizard will use Docker instead of bundled Podman
+**macOS:**
+1. **OrbStack** — Lightweight, performant (recommended)
+2. **Docker Desktop** — Standard Docker
+3. **Podman** — Fallback (system installation)
+
+**Linux:**
+1. **Podman** — Default (bundled with Container Cove or system installation)
+2. **Docker** — Fallback if Podman unavailable
+
+**Windows:**
+1. **Docker Desktop** — Primary
+2. **Podman** — Fallback (requires WSL2)
 
 ### Custom Podman Path (macOS/Linux)
 
@@ -258,5 +275,5 @@ Restart Container Cove.
 ## Getting Help
 
 - **Setup wizard troubleshooting link** — click "Learn More" in wizard
-- **GitHub Issues** — [github.com/azevedomedia0/container-cove/issues](https://github.com/azevedomedia0/container-cove/issues)
-- **GitHub Discussions** — [github.com/azevedomedia0/container-cove/discussions](https://github.com/azevedomedia0/container-cove/discussions)
+- **GitHub Issues** — [github.com/Container-Cove/Container-Cove/issues](https://github.com/Container-Cove/Container-Cove/issues)
+- **GitHub Discussions** — [github.com/Container-Cove/Container-Cove/discussions](https://github.com/Container-Cove/Container-Cove/discussions)

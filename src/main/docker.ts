@@ -78,24 +78,25 @@ async function spawnQuery(
 // re-detection works after `podman machine start` completes.
 let resolvedContainerBin: string | undefined;
 
-// Podman-first candidate list.  Podman is the bundled runtime; Docker-compatible
-// CLIs are listed as fallbacks so existing Docker Desktop installations keep
-// working without reconfiguration.
+// Container runtime candidate list.  Priority order:
+// 1. OrbStack on macOS (primary, no VM overhead)
+// 2. System Podman on Linux
+// 3. Docker-compatible fallbacks
 const CONTAINER_BINARY_CANDIDATES = [
   // Explicit overrides
   process.env.PODMAN_PATH,
   process.env.DOCKER_PATH,
-  // Bundled Podman binary placed alongside the app executable at build time
-  (() => {
-    try { return join(dirname(process.execPath), "podman"); } catch { return null; }
-  })(),
-  // System Podman — common install locations (ordered by platform likelihood)
+  // OrbStack (macOS only) — lightweight Docker-compatible environment
+  ...(process.platform === "darwin"
+    ? ["/opt/orbstack/bin/docker", "/Applications/OrbStack.app/Contents/MacOS/orbctl"]
+    : []),
+  // System Podman — common install locations (Linux primary)
   "podman",
-  "/opt/homebrew/bin/podman",          // macOS Apple Silicon (Homebrew / Podman Desktop)
-  "/usr/local/bin/podman",             // macOS Intel  (Homebrew)
-  "/usr/local/podman/bin/podman",      // Podman Desktop bundle (macOS)
+  "/opt/homebrew/bin/podman",          // macOS Homebrew (fallback if OrbStack unavailable)
+  "/usr/local/bin/podman",             // macOS Intel (fallback)
+  "/usr/local/podman/bin/podman",      // Podman Desktop bundle (macOS fallback)
   "/usr/bin/podman",                   // Linux
-  // Docker-compatible fallback (for users who prefer Docker Desktop)
+  // Docker-compatible fallback
   "docker",
   "/usr/local/bin/docker",
   "/opt/homebrew/bin/docker",
@@ -178,7 +179,8 @@ export async function startDockerDaemon(
   try {
     if (platform === "darwin") {
       if (bin) {
-        // Determine whether this is Podman or a Docker-compatible CLI
+        // OrbStack and Docker Desktop work without explicit startup
+        // Only Podman needs machine initialization
         const isPodman = bin.includes("podman") || bin === "podman";
 
         if (isPodman) {
@@ -199,14 +201,15 @@ export async function startDockerDaemon(
               env: podmanEnv(),
             });
           }
-        } else {
-          // Docker Desktop fallback
+        } else if (!bin.includes("orbstack") && !bin.includes("docker")) {
+          // Docker Desktop fallback — try to open it
           const p = Bun.spawn(["open", "-a", "Docker"], {
             stdout: "pipe",
             stderr: "pipe",
           });
           await p.exited;
         }
+        // OrbStack and Docker are already running or auto-start
       }
     } else if (platform === "win32") {
       if (bin) {

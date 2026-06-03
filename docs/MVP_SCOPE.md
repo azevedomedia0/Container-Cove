@@ -56,7 +56,7 @@ Full visual redesign:
 - Transparent scrollbar styling
 - IPC layer fixed for Electrobun ≥1.18.1 RPC envelope format
 - App window: Web UI tab (iframe) + Logs tab with sidebar
-- GitHub repository linked: https://github.com/azevedomedia0/container-cove
+- GitHub repository linked: https://github.com/Container-Cove/Container-Cove
 - MIT License added
 
 ---

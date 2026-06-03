@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "launcher",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "--hot", "serve-launcher.mjs"],
+      "port": 3333
+    }
+  ]
+}

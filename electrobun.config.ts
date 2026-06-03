@@ -2,8 +2,8 @@ const config = {
   app: {
     name: "Container Cove",
     identifier: "com.stevenazevedodesign.containercove",
-    version: "1.2.0",
-    icon: "./App_Icon.png",
+    version: "1.2.1",
+    icon: "./assets/App_Icon2.png",
   },
   runtime: {
     exitOnLastWindowClosed: false,

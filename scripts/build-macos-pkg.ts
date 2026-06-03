@@ -4,12 +4,13 @@
  *
  * The package:
  *   1. Installs Container Cove.app → /Applications/
- *   2. Installs podman + podman-mac-helper → /usr/local/bin/
- *   3. postinstall script initialises the Podman machine on first run
+ *   2. Installs OrbStack.app → /Applications/ (bundled)
+ *   3. Fixes Docker credential conflicts if Docker Desktop was installed
+ *   4. Refreshes the Dock icon
  *
  * Usage:
  *   bun scripts/build-macos-pkg.ts
- *   APPLE_SIGNING_IDENTITY="..." bun scripts/build-macos-pkg.ts
+ *   APPLE_INSTALLER_IDENTITY="Developer ID Installer: ..." bun scripts/build-macos-pkg.ts
  */
 
 import { spawn } from "child_process";
@@ -17,7 +18,6 @@ import {
   existsSync,
   mkdirSync,
   writeFileSync,
-  copyFileSync,
   rmSync,
   chmodSync,
   cpSync,
@@ -68,83 +68,98 @@ async function run(
   });
 }
 
-// ── Download Podman binaries ──────────────────────────────────────
+// ── Download + extract OrbStack ───────────────────────────────────
 
-async function downloadPodman(buildDir: string): Promise<{ podman: string; helper: string }> {
-  const arch = process.arch === "arm64" ? "arm64" : "amd64";
-  const zipName = `podman-remote-release-darwin_${arch}.zip`;
-  const url = `https://github.com/containers/podman/releases/download/v4.9.2/${zipName}`;
-  const zipPath = join(buildDir, zipName);
-  const extractDir = join(buildDir, "podman-extract");
-  const binaryPath = join(extractDir, "podman-4.9.2", "usr", "bin", "podman");
-  const helperPath = join(extractDir, "podman-4.9.2", "usr", "bin", "podman-mac-helper");
-
-  if (!existsSync(buildDir)) mkdirSync(buildDir, { recursive: true });
-
-  if (existsSync(binaryPath)) {
-    log("Using cached Podman binaries");
-    return { podman: binaryPath, helper: helperPath };
+async function fetchOrbStack(orbCacheDir: string): Promise<string> {
+  // Prefer a locally installed copy — no download needed
+  if (existsSync("/Applications/OrbStack.app")) {
+    log("OrbStack.app found in /Applications — using local copy");
+    return "/Applications/OrbStack.app";
   }
 
-  log(`Downloading Podman v4.9.2 (${arch})…`);
-  const dl = await run("curl", ["-L", "--max-time", "120", "-o", zipPath, url]);
-  if (dl.code !== 0) throw new Error(`Podman download failed: ${dl.stderr}`);
+  const arch = process.arch === "arm64" ? "arm64" : "amd64";
+  const dmgCached = join(orbCacheDir, `OrbStack-stable-${arch}.dmg`);
+  const extractedApp = join(orbCacheDir, "OrbStack.app");
 
-  if (existsSync(extractDir)) rmSync(extractDir, { recursive: true });
-  mkdirSync(extractDir, { recursive: true });
+  // Re-use a previously extracted copy to skip the slow ditto step
+  if (existsSync(extractedApp)) {
+    log(`Using cached OrbStack.app: ${extractedApp}`);
+    return extractedApp;
+  }
 
-  log("Extracting Podman archive…");
-  const ex = await run("unzip", [
-    "-o", zipPath,
-    "podman-4.9.2/usr/bin/podman",
-    "podman-4.9.2/usr/bin/podman-mac-helper",
-    "-d", extractDir,
-  ]);
-  if (ex.code !== 0) throw new Error(`Extraction failed: ${ex.stderr}`);
-  if (!existsSync(binaryPath)) throw new Error("Podman binary not found after extraction");
+  // Download DMG if not already cached
+  if (!existsSync(dmgCached)) {
+    const orbUrl = `https://orbstack.dev/download/stable/${arch}/dmg`;
+    log(`Downloading OrbStack (${arch}) from ${orbUrl} …`);
+    const r = await run(
+      "curl",
+      ["-L", "--progress-bar", "-o", dmgCached, orbUrl],
+      { timeout: 600_000 },
+    );
+    if (r.code !== 0) throw new Error(`OrbStack download failed:\n${r.stderr}`);
+    log("OrbStack download complete");
+  } else {
+    log(`Using cached OrbStack DMG: ${dmgCached}`);
+  }
 
-  chmodSync(binaryPath, 0o755);
-  if (existsSync(helperPath)) chmodSync(helperPath, 0o755);
+  // Mount → ditto → unmount
+  const mountPoint = join(orbCacheDir, "dmg-mount");
+  mkdirSync(mountPoint, { recursive: true });
 
-  log("Podman binaries ready");
-  return { podman: binaryPath, helper: helperPath };
+  // Detach stale mount if any
+  await run("hdiutil", ["detach", mountPoint, "-quiet", "-force"], { timeout: 30_000 });
+
+  log("Mounting OrbStack DMG…");
+  const mountR = await run(
+    "hdiutil",
+    ["attach", dmgCached, "-nobrowse", "-quiet", "-mountpoint", mountPoint],
+    { timeout: 120_000 },
+  );
+  if (mountR.code !== 0) throw new Error(`DMG mount failed:\n${mountR.stderr}`);
+
+  try {
+    const appInDmg = join(mountPoint, "OrbStack.app");
+    if (!existsSync(appInDmg))
+      throw new Error(`OrbStack.app not found in mounted DMG at ${appInDmg}`);
+
+    log("Extracting OrbStack.app (this may take a minute)…");
+    // ditto preserves HFS+ metadata / symlinks better than cpSync
+    const dittoR = await run(
+      "ditto",
+      [appInDmg, extractedApp],
+      { timeout: 300_000 },
+    );
+    if (dittoR.code !== 0) throw new Error(`ditto failed:\n${dittoR.stderr}`);
+    log("OrbStack.app extracted");
+  } finally {
+    await run("hdiutil", ["detach", mountPoint, "-quiet", "-force"], { timeout: 60_000 });
+  }
+
+  return extractedApp;
 }
 
 // ── Stage root payload ────────────────────────────────────────────
-// Strategy: bundle Podman INSIDE the .app (Contents/MacOS/podman).
-// The postinstall script then copies it from the app to /usr/local/bin.
-// This avoids any separate payload to /usr/local/bin that macOS can block.
 
 function stagePayload(
   stageDir: string,
   appSrcPath: string,
-  podmanBinary: string,
-  helperBinary: string,
+  orbStackPath: string,
 ): void {
   log("Staging installer payload…");
   if (existsSync(stageDir)) rmSync(stageDir, { recursive: true });
 
-  // /Applications/Container Cove.app
   const appsDir = join(stageDir, "Applications");
   mkdirSync(appsDir, { recursive: true });
+
+  // Container Cove.app
   const appDest = join(appsDir, "Container Cove.app");
   cpSync(appSrcPath, appDest, { recursive: true });
-  log(`Staged app → ${appDest}`);
+  log(`Staged Container Cove.app → ${appDest}`);
 
-  // Embed Podman binaries inside the app bundle (Contents/MacOS/)
-  // postinstall will copy them to /usr/local/bin after the app is installed
-  const macosDir = join(appDest, "Contents", "MacOS");
-  mkdirSync(macosDir, { recursive: true });
-
-  copyFileSync(podmanBinary, join(macosDir, "podman"));
-  chmodSync(join(macosDir, "podman"), 0o755);
-  log("Bundled podman → app bundle Contents/MacOS/podman");
-
-  if (existsSync(helperBinary)) {
-    copyFileSync(helperBinary, join(macosDir, "podman-mac-helper"));
-    chmodSync(join(macosDir, "podman-mac-helper"), 0o755);
-    log("Bundled podman-mac-helper → app bundle Contents/MacOS/podman-mac-helper");
-  }
+  // OrbStack.app
+  const orbDest = join(appsDir, "OrbStack.app");
+  cpSync(orbStackPath, orbDest, { recursive: true });
+  log(`Staged OrbStack.app → ${orbDest}`);
 }
 
 // ── Scripts (pre/post install) ────────────────────────────────────
@@ -152,40 +167,112 @@ function stagePayload(
 function writeScripts(scriptsDir: string): void {
   mkdirSync(scriptsDir, { recursive: true });
 
-  // preinstall: ensure /usr/local/bin exists
+  // preinstall: disk space check only (OrbStack is bundled)
   const preinstall = `#!/bin/bash
-/bin/mkdir -p /usr/local/bin
-/bin/chmod 755 /usr/local/bin
-exit 0
-`;
+set -euo pipefail
 
-  // postinstall: copy Podman from inside the app bundle to /usr/local/bin
-  const postinstall = `#!/bin/bash
-APP="/Applications/Container Cove.app"
-SRC_PODMAN="$APP/Contents/MacOS/podman"
-SRC_HELPER="$APP/Contents/MacOS/podman-mac-helper"
-DST="/usr/local/bin"
+info() { echo "[Container Cove] $1"; }
+warn() { echo "[Container Cove] ⚠ $1"; }
 
-echo "[Container Cove] Installing Podman to $DST..."
-
-/bin/mkdir -p "$DST"
-
-if [ ! -f "$SRC_PODMAN" ]; then
-  echo "[Container Cove] ERROR: podman not found inside app bundle at $SRC_PODMAN"
+# Require at least 1 GB free on the target volume
+FREE_KB=$(df -k / | awk 'NR==2{print $4}')
+MIN_KB=$((1024 * 1024))
+if [ "\${FREE_KB}" -lt "\${MIN_KB}" ]; then
+  warn "Less than 1 GB free on /. Please free up disk space and retry."
   exit 1
 fi
 
-/bin/cp -f "$SRC_PODMAN" "$DST/podman"
-/bin/chmod 755 "$DST/podman"
-echo "[Container Cove] Installed podman → $DST/podman"
+info "Disk space OK ($(( FREE_KB / 1024 )) MB free)"
+exit 0
+`;
 
-if [ -f "$SRC_HELPER" ]; then
-  /bin/cp -f "$SRC_HELPER" "$DST/podman-mac-helper"
-  /bin/chmod 755 "$DST/podman-mac-helper"
-  echo "[Container Cove] Installed podman-mac-helper → $DST/podman-mac-helper"
+  // postinstall: ownership, credential fix, OrbStack first-launch, Dock refresh
+  const postinstall = `#!/bin/bash
+set -euo pipefail
+
+CC_APP="/Applications/Container Cove.app"
+ORB_APP="/Applications/OrbStack.app"
+
+info()    { echo "[Container Cove] $1"; }
+success() { echo "[Container Cove] ✓ $1"; }
+warn()    { echo "[Container Cove] ⚠ $1"; }
+
+# Determine the real (non-root) user running the install
+REAL_USER="\${SUDO_USER:-}"
+if [ -z "\${REAL_USER}" ] || [ "\${REAL_USER}" = "root" ]; then
+  REAL_USER="$(stat -f '%Su' /dev/console 2>/dev/null || echo '')"
 fi
 
-echo "[Container Cove] Podman installation complete"
+# ── 1. Fix app ownership ─────────────────────────────────────────────────────
+if [ -n "\${REAL_USER}" ] && [ "\${REAL_USER}" != "root" ]; then
+  /usr/sbin/chown -R "\${REAL_USER}":staff "\${CC_APP}"
+  /usr/sbin/chown -R "\${REAL_USER}":staff "\${ORB_APP}"
+  success "App ownership set to \${REAL_USER}"
+fi
+
+# ── 2. Fix Docker credential store (docker-credential-desktop bug) ───────────
+if [ -n "\${REAL_USER}" ] && [ "\${REAL_USER}" != "root" ]; then
+  USER_HOME="$(eval echo ~\${REAL_USER})"
+
+  CC_DOCKER_DIR="\${USER_HOME}/.config/container-cove/docker"
+  CC_DOCKER_CFG="\${CC_DOCKER_DIR}/config.json"
+  /bin/mkdir -p "\${CC_DOCKER_DIR}"
+  if [ ! -f "\${CC_DOCKER_CFG}" ]; then
+    echo '{ "auths": {} }' > "\${CC_DOCKER_CFG}"
+  fi
+  /usr/sbin/chown -R "\${REAL_USER}":staff "\${USER_HOME}/.config/container-cove"
+  success "Clean Docker config created → \${CC_DOCKER_CFG}"
+
+  DOCKER_CFG="\${USER_HOME}/.docker/config.json"
+  if [ -f "\${DOCKER_CFG}" ]; then
+    if grep -q '"credsStore"' "\${DOCKER_CFG}" 2>/dev/null; then
+      /bin/cp "\${DOCKER_CFG}" "\${DOCKER_CFG}.bak"
+      python3 -c "
+import json
+with open('\${DOCKER_CFG}', 'r') as f:
+    cfg = json.load(f)
+cfg.pop('credsStore', None)
+cfg.pop('credStore', None)
+with open('\${DOCKER_CFG}', 'w') as f:
+    json.dump(cfg, f, indent=2)
+" 2>/dev/null && warn "Removed broken credsStore from \${DOCKER_CFG} (backup: \${DOCKER_CFG}.bak)" || true
+    fi
+  fi
+fi
+
+# ── 3. Clean up old receipts & app list ──────────────────────────────────────
+if [ -n "\${REAL_USER}" ] && [ "\${REAL_USER}" != "root" ]; then
+  USER_HOME="$(eval echo ~\${REAL_USER})"
+  APPS_JSON="\${USER_HOME}/Library/Application Support/container-cove/apps.json"
+  if [ -f "\${APPS_JSON}" ]; then
+    /bin/rm -f "\${APPS_JSON}"
+    info "Cleared previous app list → fresh start"
+  fi
+fi
+
+for receipt in com.stevenazevedodesign.containercove com.azevedomedia.containercove; do
+  if /usr/sbin/pkgutil --pkg-info "\${receipt}" >/dev/null 2>&1; then
+    /usr/sbin/pkgutil --forget "\${receipt}" >/dev/null 2>&1 || true
+    info "Cleared old receipt: \${receipt}"
+  fi
+done
+
+# ── 4. Launch OrbStack so it can initialize its VM on first run ──────────────
+if [ -n "\${REAL_USER}" ] && [ "\${REAL_USER}" != "root" ]; then
+  info "Launching OrbStack to complete initial setup…"
+  /bin/launchctl asuser "$(id -u "\${REAL_USER}")" \
+    /usr/bin/open -a "\${ORB_APP}" 2>/dev/null || true
+  success "OrbStack launch requested"
+fi
+
+# ── 5. Refresh macOS icon cache ──────────────────────────────────────────────
+/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -f "\${CC_APP}" 2>/dev/null || true
+/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -f "\${ORB_APP}" 2>/dev/null || true
+/usr/bin/touch "\${CC_APP}"
+/usr/bin/killall Dock 2>/dev/null || true
+success "Dock icons refreshed"
+
+success "Installation complete! Open Container Cove from your Applications folder."
 exit 0
 `;
 
@@ -216,7 +303,7 @@ async function buildComponentPkg(
     "--scripts", scriptsDir,
     "--install-location", "/",
     componentPkg,
-  ], { timeout: 120_000 });
+  ], { timeout: 180_000 });
   if (r.code !== 0) throw new Error(`pkgbuild failed: ${r.stderr || r.stdout}`);
   log(`Component pkg → ${componentPkg}`);
   return componentPkg;
@@ -224,16 +311,23 @@ async function buildComponentPkg(
 
 // ── Write distribution XML ────────────────────────────────────────
 
-function writeDistribution(xmlPath: string, componentPkg: string, version: string): void {
+function writeDistribution(
+  xmlPath: string,
+  componentPkg: string,
+  version: string,
+  hasBackground: boolean,
+): void {
+  const bgLine = hasBackground
+    ? `  <background file="background.png" scaling="proportional" alignment="bottomleft" mime-type="image/png"/>\n`
+    : "";
   const xml = `<?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="2">
   <title>Container Cove ${version}</title>
   <welcome file="welcome.html" mime-type="text/html"/>
   <organization>com.stevenazevedodesign</organization>
   <domains enable_localSystem="true" enable_userHome="false"/>
-  <options customize="never" require-scripts="false" rootVolumeOnly="true"/>
-  <background file="background.png" scaling="proportional" alignment="bottomleft"/>
-  <pkg-ref id="com.stevenazevedodesign.containercove"/>
+  <options customize="never" require-scripts="true" allow-external-scripts="yes" rootVolumeOnly="true"/>
+${bgLine}  <pkg-ref id="com.stevenazevedodesign.containercove"/>
   <choices-outline>
     <line choice="default">
       <line choice="com.stevenazevedodesign.containercove"/>
@@ -243,7 +337,7 @@ function writeDistribution(xmlPath: string, componentPkg: string, version: strin
   <choice id="com.stevenazevedodesign.containercove" visible="false">
     <pkg-ref id="com.stevenazevedodesign.containercove"/>
   </choice>
-  <pkg-ref id="com.stevenazevedodesign.containercove" version="${version}" onConclusion="none">${componentPkg.split("/").pop()}</pkg-ref>
+  <pkg-ref id="com.stevenazevedodesign.containercove" version="${version}" onConclusion="none" auth="root">${componentPkg.split("/").pop()}</pkg-ref>
 </installer-gui-script>
 `;
   writeFileSync(xmlPath, xml);
@@ -253,16 +347,59 @@ function writeDistribution(xmlPath: string, componentPkg: string, version: strin
 
 function writeWelcome(resourcesDir: string, version: string): void {
   const html = `<!DOCTYPE html>
-<html>
-<body style="font-family:-apple-system,sans-serif;padding:20px">
-<h2>Container Cove ${version}</h2>
-<p>This installer will:</p>
-<ul>
-  <li>Install <strong>Container Cove</strong> to <code>/Applications</code></li>
-  <li>Install <strong>Podman v4.9.2</strong> to <code>/usr/local/bin</code></li>
-  <li>Initialise the Podman machine on first run</li>
-</ul>
-<p>No Docker daemon or background service required.</p>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #1d1d1f;
+    padding: 20px 24px;
+    margin: 0;
+  }
+  h2 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0 0 10px;
+    color: #000;
+  }
+  p { margin: 0 0 10px; }
+  ul { margin: 0 0 12px; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  .included {
+    background: #f0faf0;
+    border: 1px solid #6abf6a;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 14px;
+  }
+  .included strong { color: #2a6e2a; }
+  code {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    background: #f2f2f7;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+  <h2>Container Cove ${version}</h2>
+  <p>Run Docker containers as desktop apps — no terminal needed.</p>
+  <p>This installer will:</p>
+  <ul>
+    <li>Install <strong>Container Cove.app</strong> to <code>/Applications</code></li>
+    <li>Install <strong>OrbStack.app</strong> to <code>/Applications</code> (container engine)</li>
+    <li>Configure Docker credentials for clean image pulls</li>
+    <li>Refresh the Dock icons immediately</li>
+  </ul>
+  <div class="included">
+    <strong>✓ OrbStack Included</strong><br>
+    OrbStack is bundled in this installer — no separate download required.
+    It will launch automatically after installation to complete its initial setup.
+  </div>
 </body>
 </html>`;
   writeFileSync(join(resourcesDir, "welcome.html"), html);
@@ -289,7 +426,7 @@ async function buildProductPkg(
   }
   args.push(outputPkg);
 
-  const r = await run("productbuild", args, { timeout: 180_000 });
+  const r = await run("productbuild", args, { timeout: 300_000 });
   if (r.code !== 0) throw new Error(`productbuild failed: ${r.stderr || r.stdout}`);
   log(`Product pkg → ${outputPkg}`);
 }
@@ -301,19 +438,20 @@ if (import.meta.main) {
     try {
       const root = resolve(import.meta.dir, "..");
       const buildDir = join(root, "build");
+      const orbCacheDir = join(buildDir, "orb-cache");
       const pkgWorkDir = join(buildDir, "pkg-work");
       const stageDir = join(pkgWorkDir, "stage");
       const scriptsDir = join(pkgWorkDir, "scripts");
       const resourcesDir = join(pkgWorkDir, "resources");
 
       // Read version from package.json
-      let version = "1.2.0";
+      let version = "1.2.1";
       try {
         const pkg = JSON.parse(await Bun.file(join(root, "package.json")).text());
         if (pkg.version) version = pkg.version;
       } catch { /* fallback */ }
 
-      // Locate .app (prefer production, fall back to dev build)
+      // Locate Container Cove .app (prefer production, fall back to dev build)
       const appPath = (() => {
         const prod = join(buildDir, "Container Cove.app");
         if (existsSync(prod)) return prod;
@@ -323,7 +461,7 @@ if (import.meta.main) {
       })();
 
       const outputPkg = join(buildDir, `Container Cove-${version}.pkg`);
-      const signIdentity = process.env.APPLE_INSTALLER_IDENTITY; // "Developer ID Installer: ..."
+      const signIdentity = process.env.APPLE_INSTALLER_IDENTITY;
 
       log("=== Container Cove macOS PKG Builder ===");
       log(`Version:  ${version}`);
@@ -332,19 +470,58 @@ if (import.meta.main) {
       log(`Signing:  ${signIdentity ?? "disabled (set APPLE_INSTALLER_IDENTITY)"}`);
       log("");
 
-      // 1. Download Podman
-      const { podman, helper } = await downloadPodman(buildDir);
-
-      // 2. Stage payload
+      // 1. Fetch OrbStack (download if needed, cache in build/orb-cache/)
+      mkdirSync(orbCacheDir, { recursive: true });
       mkdirSync(pkgWorkDir, { recursive: true });
-      stagePayload(stageDir, appPath, podman, helper);
+      const orbStackPath = await fetchOrbStack(orbCacheDir);
+
+      // 2. Stage payload (Container Cove + OrbStack)
+      stagePayload(stageDir, appPath, orbStackPath);
 
       // 3. Write installer scripts
       writeScripts(scriptsDir);
 
-      // 4. Write welcome page
+      // 4. Write welcome page + optional background image
       mkdirSync(resourcesDir, { recursive: true });
       writeWelcome(resourcesDir, version);
+
+      let hasBackground = false;
+      const iconSrc = join(root, "assets", "App_Icon.png");
+      const bgPath = join(resourcesDir, "background.png");
+      if (existsSync(iconSrc)) {
+        const makeBackground = await run("python3", ["-c", `
+import subprocess, os
+icon = "${iconSrc}"
+out  = "${bgPath}"
+tmp  = out + ".icon128.png"
+subprocess.run(["sips", "-z", "128", "128", icon, "--out", tmp], check=True, capture_output=True)
+try:
+    from AppKit import NSImage, NSGraphicsContext, NSColor, NSRect, NSSize
+    import Quartz
+    bg = NSImage.alloc().initWithSize_(NSSize(600, 400))
+    bg.lockFocus()
+    NSColor.whiteColor().setFill()
+    from AppKit import NSRectFill
+    NSRectFill(((0,0),(600,400)))
+    icon_img = NSImage.alloc().initWithContentsOfFile_(tmp)
+    if icon_img:
+        x = (600 - 128) / 2
+        y = (400 - 128) / 2
+        icon_img.drawInRect_(((x, y), (128, 128)))
+    bg.unlockFocus()
+    data = bg.TIFFRepresentation()
+    from AppKit import NSBitmapImageRep, NSPNGFileType
+    rep = NSBitmapImageRep.imageRepWithData_(data)
+    png = rep.representationUsingType_properties_(NSPNGFileType, None)
+    png.writeToFile_atomically_(out, True)
+    os.unlink(tmp)
+except Exception:
+    import shutil; shutil.copy(tmp, out); os.unlink(tmp)
+`]);
+        hasBackground = makeBackground.code === 0 && existsSync(bgPath);
+        if (hasBackground) log("Generated background.png for installer");
+        else log("Background image generation skipped — continuing without it");
+      }
 
       // 5. Component pkg
       const componentPkg = await buildComponentPkg(
@@ -354,7 +531,7 @@ if (import.meta.main) {
 
       // 6. Distribution XML
       const distributionXml = join(pkgWorkDir, "distribution.xml");
-      writeDistribution(distributionXml, componentPkg, version);
+      writeDistribution(distributionXml, componentPkg, version, hasBackground);
 
       // 7. Final product pkg
       await buildProductPkg(distributionXml, componentPkg, resourcesDir, outputPkg, signIdentity);

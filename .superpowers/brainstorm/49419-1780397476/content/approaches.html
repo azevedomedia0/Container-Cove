@@ -1,0 +1,40 @@
+<h2>Three approaches to the trim overlay</h2>
+<p class="subtitle">All three use ffmpeg for keyframe-accurate export via a file picker. The difference is the overlay UI.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Draggable handle timeline (Recommended)</h3>
+      <p>A slim bar slides up from the bottom of the video with a full-width progress strip. Two draggable handles mark the in/out points. Click anywhere on the strip to jump to that position. Time codes shown next to each handle. "Save Trim" and "Cancel" buttons.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>Intuitive, familiar UX</li><li>Visual feedback of selected range</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Complex drag logic in overlay JS</li><li>IINA overlay mouse events can be finicky</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Mark-in / Mark-out buttons</h3>
+      <p>Overlay shows two buttons: "Set Start" and "Set End" — each captures the current playback position. Below them, a read-only display shows the selected range (e.g. 0:32 → 1:14 | duration: 0:42). "Save Trim" and "Cancel" buttons. Play the video, pause where you want, tap the button.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>Simple, reliable implementation</li><li>Works great with keyboard shortcuts</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>No visual scrubbing in the trim UI itself</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Time input fields</h3>
+      <p>Overlay shows editable time fields for start and end. A "Use Current Time" button fills each field with the current playback position. A progress bar preview highlights the selected range but isn't draggable. Clean and precise.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>Exact control with typed values</li><li>Moderate implementation complexity</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>More typing than visual trim tools</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

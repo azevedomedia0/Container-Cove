@@ -61,8 +61,9 @@ const features: Feature[] = [
 				<!-- Left block -->
 				<section class="group max-w-2xl *:transition *:duration-500 *:ease-in-out grow">
 					<!-- Title -->
-					<h1 class="bg-clip-text font-title font-medium text-transparent text-8xl md:text-[12rem] lg:text-[16rem] xl:text-[20rem] lg:text-left text-center uppercase title title-bg leading-[0.85]">
-						This is Container Cove
+					<h1 class="bg-clip-text font-title font-medium text-transparent text-[12rem] md:text-[24rem] lg:text-[32rem] xl:text-[40rem] lg:text-left text-center uppercase title title-bg leading-[0.8]">
+						This is
+						<span class="block">Container Cove</span>
 					</h1>
 					<!-- Subtitle -->
 					<p class="mt-4 font-mono font-medium text-xl lg:text-2xl lg:text-left text-center">

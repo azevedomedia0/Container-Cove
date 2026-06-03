@@ -61,8 +61,8 @@ const features: Feature[] = [
 				<!-- Left block -->
 				<section class="group max-w-2xl *:transition *:duration-500 *:ease-in-out grow">
 					<!-- Title -->
-					<h1 class="bg-clip-text font-title font-medium text-transparent text-7xl md:text-9xl lg:text-[10rem] xl:text-[12rem] lg:text-left text-center uppercase title title-bg leading-[0.9]">
-						Container Cove
+					<h1 class="bg-clip-text font-title font-medium text-transparent text-8xl md:text-[12rem] lg:text-[16rem] xl:text-[20rem] lg:text-left text-center uppercase title title-bg leading-[0.85]">
+						This is Container Cove
 					</h1>
 					<!-- Subtitle -->
 					<p class="mt-4 font-mono font-medium text-xl lg:text-2xl lg:text-left text-center">
@@ -111,7 +111,7 @@ const features: Feature[] = [
 				<template v-for="feature in features" :key="feature.title">
 					<component
 						:is="feature.url ? 'a' : 'div'"
-						class="group relative flex flex-col justify-center gap-4 bg-[#59a3ea] p-6 rounded-lg ring-1 ring-[var(--ui-border)]"
+						class="group relative flex flex-col justify-center gap-4 bg-[#59a3ea] p-6 rounded-3xl ring-1 ring-[var(--ui-border)]"
 						:class="{ 'cursor-pointer': feature.url }"
 						:href="feature.url"
 					>

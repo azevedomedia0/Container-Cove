@@ -3,7 +3,7 @@ interface Feature {
 	title: string
 	description: string
 	url?: string
-	icon?: string
+	icon: string
 }
 
 const features: Feature[] = [
@@ -11,31 +11,37 @@ const features: Feature[] = [
 		title: 'App Launcher',
 		description: 'Search, drag-and-drop reorder, and launch containers from a beautiful grid with live status badges.',
 		url: '/guide/app-launcher',
+		icon: '/icons/mermaid.png',
 	},
 	{
 		title: 'Recommended Catalog',
 		description: '26+ curated self-hosted apps with one-click install, pre-filled env vars, and volumes.',
 		url: '/guide/catalog',
+		icon: '/icons/shell.png',
 	},
 	{
 		title: 'Docker Lifecycle',
 		description: 'Launch, stop, and restart containers with live log streaming, health badges, and CPU/MEM metrics.',
 		url: '/guide/docker-lifecycle',
+		icon: '/icons/snail.png',
 	},
 	{
 		title: 'Compose Import',
 		description: 'Import existing Docker Compose YAML files — one app per service, automatically configured.',
 		url: '/guide/compose-import',
+		icon: '/icons/starfish.png',
 	},
 	{
 		title: 'Desktop Shortcuts',
 		description: 'Auto-generates .app bundles on your Desktop for any container. Launch like a native app.',
 		url: '/guide/web-ui',
+		icon: '/icons/turtle.png',
 	},
 	{
 		title: 'System Tray',
 		description: 'Per-app live status dots, click-to-launch, and global Stop All / Restart All controls.',
 		url: '/guide/system-tray',
+		icon: '/icons/sun.png',
 	},
 ]
 </script>
@@ -102,6 +108,13 @@ const features: Feature[] = [
 						:class="{ 'cursor-pointer': feature.url }"
 						:href="feature.url"
 					>
+						<div class="top-2 right-2 absolute flex justify-center items-center w-14 h-14 shrink-0">
+							<img
+								:src="feature.icon"
+								alt=""
+								class="opacity-40 dark:opacity-30 group-hover:opacity-100 size-full object-contain transition duration-300"
+							/>
+						</div>
 						<div>
 							<span
 								class="inline-block text-[var(--ui-text-muted)] group-hover:text-[var(--ui-text)] transition font-mono uppercase font-medium tracking-wide"
